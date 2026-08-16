@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#15130F">
+<meta name="description" content="A hand-picked wallpaper gallery with a surprise-me pick and one-tap downloads.">
+<title>Blapples Wallpaper Collection</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2218%22 fill=%22%23c7d39a%22/%3E%3Cg fill=%22none%22 stroke=%22%23171a12%22 stroke-width=%223.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M50.9 28.4c2.2 2.6 1.8 5.8 1.8 8.7 0 7.8-10.5 10-16.7 10S19.3 44.9 19.3 37.1c0-2.9-.5-6.1 1.7-8.7M50.9 28.4c-.4-.5-.9-.9-1.4-1.3M50.9 28.4c1.4.8 1.8-2.2 1.8-3.2v-3.7c0-3.2-2.2-4.3-4.1-4.3s-5.7 3.1-7 3.1c-1.5 0-1.8-.3-4.8-.3s-3.3.3-4.8.3c-1.3 0-5.1-3.1-7-3.1s-4.1 1.1-4.1 4.3v3.7c0 1 .4 4 1.8 3.2M21 28.4c.4-.5.9-.9 1.4-1.3M40.6 39c0 .3-.7.6-1.5.6s-1.5-.3-1.5-.6.7-.6 1.5-.6 1.5.3 1.5.6ZM45.7 34.3c0 .8-.4 1.4-.9 1.4s-.9-.6-.9-1.4.4-1.4.9-1.4.9.6.9 1.4ZM34.3 34.3c0 .8-.4 1.4-.9 1.4s-.9-.6-.9-1.4.4-1.4.9-1.4.9.6.9 1.4ZM58 37.8c-1-.6-5.2-2.2-6.8-2.2M54.8 42.8c-1-.6-3.2-2.2-4.8-2.2M6 37.8c1-.6 5.2-2.2 6.8-2.2M9.2 42.8c1-.6 3.2-2.2 4.8-2.2%22/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.github.com">
+<link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* Material Expressive-inspired olive / sage palette from the reference */
+    --md-primary:#c7d39a;
+    --md-on-primary:#171a12;
+    --md-primary-container:#4f5b36;
+    --md-on-primary-container:#e4e9d2;
+
+    --md-secondary:#8f9d70;
+    --md-on-secondary:#151811;
+    --md-secondary-container:#303722;
+    --md-on-secondary-container:#dce4c2;
+
+    --md-tertiary:#aeb982;
+    --md-on-tertiary:#181b13;
+
+    --md-surface:#11130f;
+    --md-surface-container-low:rgba(22,25,18,.82);
+    --md-surface-container:rgba(27,31,22,.88);
+    --md-surface-container-high:rgba(35,40,27,.92);
+    --md-surface-container-highest:rgba(45,51,33,.95);
+    --md-on-surface:#eef1e4;
+    --md-on-surface-variant:#aeb69a;
+    --md-outline:rgba(190,205,151,.24);
+
+    --shape-xs:10px;
+    --shape-sm:18px;
+    --shape-md:24px;
+    --shape-lg:28px;
+    --shape-xl:28px;
+    --shape-expressive:28px;
+    --shape-full:999px;
+
+    --elev-1:0 2px 10px rgba(18,22,13,.18);
+    --elev-2:0 8px 28px rgba(18,22,13,.24);
+    --elev-3:0 18px 50px rgba(10,13,8,.34);
+
+    --spring:cubic-bezier(.22,1.35,.36,1);
+    --standard:cubic-bezier(.2,0,0,1);
+    --font:'Roboto Flex',Roboto,system-ui,sans-serif;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  html{scroll-behavior:smooth}
+
+  body{
+    min-height:100vh;
+    color:var(--md-on-surface);
+    font-family:var(--font);
+    font-optical-sizing:auto;
+    -webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(circle at 18% 15%,rgba(150,170,105,.14),transparent 30%),
+      radial-gradient(circle at 85% 30%,rgba(115,140,76,.12),transparent 32%),
+      linear-gradient(145deg,#0b0d0a,#151912 48%,#090b08);
+    overflow-x:hidden;
+  }
+
+  /* Ambient wallpaper behind the whole interface */
+  .ambient-bg{
+    position:fixed;
+    inset:-6%;
+    z-index:-3;
+    background-position:center;
+    background-size:cover;
+    opacity:.40;
+    filter:blur(34px) saturate(.72);
+    transform:scale(1.08);
+    transition:background-image .8s ease,opacity .5s ease;
+  }
+  .ambient-scrim{
+    position:fixed;
+    inset:0;
+    z-index:-2;
+    pointer-events:none;
+    background:
+      linear-gradient(180deg,rgba(8,10,7,.60),rgba(9,12,8,.82)),
+      radial-gradient(circle at 50% 20%,transparent 0 25%,rgba(5,7,5,.42) 100%);
+  }
+
+  button{font:inherit;color:inherit;border:0;background:none}
+
+  .topbar{
+    position:sticky;
+    top:18px;
+    z-index:30;
+    width:min(1440px,calc(100% - 36px));
+    margin:18px auto 28px;
+    padding:18px 20px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:20px;
+    background:rgba(18,21,15,.90);
+    border:1px solid rgba(190,205,151,.12);
+    border-radius:var(--shape-lg);
+    box-shadow:var(--elev-2);
+    backdrop-filter:blur(24px) saturate(1.12);
+    -webkit-backdrop-filter:blur(24px) saturate(1.12);
+  }
+
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    min-width:0;
+  }
+
+  .brand-mark{
+    width:52px;
+    height:52px;
+    flex:0 0 auto;
+    display:grid;
+    place-items:center;
+    border-radius:var(--shape-lg);
+    background:var(--md-primary);
+    color:var(--md-on-primary);
+    box-shadow:0 5px 18px rgba(0,0,0,.18);
+  }
+
+  .brand-mark svg{width:25px;height:25px;display:block}
+
+  .brand-copy{min-width:0}
+  h1{
+    margin:0;
+    font-size:clamp(25px,3vw,36px);
+    line-height:1;
+    letter-spacing:-.035em;
+    font-weight:700;
+  }
+
+  .subtitle{
+    margin:6px 0 0;
+    color:var(--md-on-surface-variant);
+    font-size:13px;
+    line-height:1.35;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:55vw;
+  }
+
+  .eyebrow-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    padding:10px 14px;
+    border-radius:var(--shape-full);
+    background:rgba(166,184,117,.10);
+    color:var(--md-on-surface-variant);
+    border:1px solid rgba(235,240,214,.12);
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.02em;
+    white-space:nowrap;
+  }
+  .eyebrow-chip svg{width:14px;height:14px}
+
+  .grid{
+    width:min(1440px,calc(100% - 36px));
+    margin:0 auto;
+    padding:0 0 150px;
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(270px,1fr));
+    gap:18px;
+    align-items:start;
+  }
+
+  /*
+    The reference uses wallpapers as visual surfaces rather than cropped
+    square thumbnails. Cards therefore keep the entire image visible.
+  */
+  .card{
+    position:relative;
+    width:100%;
+    aspect-ratio:16 / 9;
+    height:auto;
+    min-height:0;
+    overflow:hidden;
+    cursor:pointer;
+    padding:0;
+    border-radius:var(--shape-lg);
+    background:rgba(45,50,35,.72);
+    border:1px solid rgba(241,245,218,.12);
+    box-shadow:var(--elev-1);
+    isolation:isolate;
+    opacity:0;
+    transform:translateY(18px) scale(.985);
+    transition:
+      opacity .55s var(--spring),
+      transform .55s var(--spring),
+      box-shadow .35s var(--standard),
+      border-radius .45s var(--spring);
+    content-visibility:auto;
+    contain-intrinsic-size:320px 340px;
+  }
+  .card.visible{opacity:1;transform:none}
+
+  .card::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    z-index:1;
+    pointer-events:none;
+    background:linear-gradient(
+      180deg,
+      rgba(255,255,255,.035),
+      transparent 26%,
+      transparent 62%,
+      rgba(20,24,14,.48)
+    );
+  }
+
+  .card:hover,.card:focus-visible{
+    box-shadow:var(--elev-3);
+    transform:translateY(-6px) scale(1.012);
+    border-color:rgba(236,241,211,.24);
+    border-radius:var(--shape-lg);
+    z-index:2;
+  }
+
+  .card img{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    display:block;
+    object-fit:cover;
+    background:
+      radial-gradient(circle at 50% 35%,rgba(177,190,140,.20),transparent 55%),
+      rgba(8,10,7,.92);
+    transition:transform .7s var(--standard),filter .5s ease;
+  }
+
+  .card:hover img{
+    transform:scale(1.025);
+    filter:saturate(1.04);
+  }
+
+  /* Wallpaper names are hidden on the cards to keep the gallery compact.
+     The name is still shown in the lightbox after clicking a wallpaper. */
+  .card-overlay{
+    display:none;
+  }
+
+  .card-title{
+    font-size:15px;
+    font-weight:650;
+    letter-spacing:-.01em;
+    color:var(--md-on-surface);
+  }
+
+  .card:focus-visible{
+    outline:2px solid var(--md-primary);
+    outline-offset:3px;
+  }
+
+  .skeleton{
+    aspect-ratio:16 / 9;
+    height:auto;
+    min-height:0;
+    border-radius:var(--shape-lg);
+    background:linear-gradient(
+      110deg,
+      rgba(17,20,14,.78) 30%,
+      rgba(58,70,38,.55) 50%,
+      rgba(17,20,14,.78) 70%
+    );
+    background-size:200% 100%;
+    animation:shimmer 1.6s ease-in-out infinite;
+  }
+
+  @keyframes shimmer{
+    0%{background-position:200% 0}
+    100%{background-position:-200% 0}
+  }
+
+  @keyframes pulse-ring{
+    0%{box-shadow:var(--elev-2),0 0 0 0 rgba(217,223,189,.50)}
+    70%{box-shadow:var(--elev-2),0 0 0 18px rgba(217,223,189,0)}
+    100%{box-shadow:var(--elev-1),0 0 0 0 rgba(217,223,189,0)}
+  }
+  .card.pulse{animation:pulse-ring 1s var(--standard)}
+
+  .fab{
+    position:fixed;
+    right:28px;
+    bottom:28px;
+    z-index:40;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    padding:15px 22px 15px 18px;
+    border-radius:var(--shape-lg);
+    background:var(--md-primary);
+    color:var(--md-on-primary);
+    font-weight:700;
+    font-size:14px;
+    cursor:pointer;
+    box-shadow:var(--elev-3);
+    transition:box-shadow .25s var(--standard),transform .2s var(--spring),border-radius .35s var(--spring);
+  }
+
+  .fab:hover{
+    transform:translateY(-3px) scale(1.02);
+    border-radius:var(--shape-lg);
+  }
+  .fab:active{transform:scale(.94)}
+  .fab svg{width:19px;height:19px}
+
+  .scrim{
+    position:fixed;
+    inset:0;
+    z-index:100;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background:rgba(20,23,15,.64);
+    backdrop-filter:blur(22px) saturate(.8);
+    -webkit-backdrop-filter:blur(22px) saturate(.8);
+    animation:fade-in .2s ease;
+  }
+  .scrim[hidden]{display:none}
+
+  @keyframes fade-in{from{opacity:0}to{opacity:1}}
+
+  .dialog{
+    width:min(1120px,94vw);
+    max-height:92vh;
+    overflow:auto;
+    padding:16px;
+    background:rgba(52,58,41,.88);
+    border:1px solid rgba(190,205,151,.15);
+    border-radius:var(--shape-lg);
+    box-shadow:var(--elev-3);
+    backdrop-filter:blur(30px) saturate(1.1);
+    -webkit-backdrop-filter:blur(30px) saturate(1.1);
+    animation:dialog-in .45s var(--spring);
+  }
+
+  @keyframes dialog-in{
+    from{opacity:0;transform:scale(.94) translateY(18px)}
+    to{opacity:1;transform:none}
+  }
+
+  .dialog-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:12px;
+  }
+
+  .dialog-count{
+    padding:9px 13px;
+    border-radius:var(--shape-full);
+    background:rgba(157,176,109,.10);
+    color:var(--md-on-surface-variant);
+    font-size:12px;
+    font-weight:650;
+  }
+
+  .dialog-media{
+    position:relative;
+    min-height:300px;
+    display:grid;
+    place-items:center;
+    overflow:hidden;
+    border-radius:var(--shape-lg);
+    background:rgba(7,9,6,.88);
+  }
+
+  .dialog-media::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      radial-gradient(circle at 50% 40%,rgba(193,207,150,.12),transparent 60%);
+    pointer-events:none;
+  }
+
+  .dialog-media img{
+    position:relative;
+    z-index:1;
+    width:100%;
+    max-height:70vh;
+    display:block;
+    object-fit:contain;
+    opacity:0;
+    transition:opacity .25s ease;
+  }
+  .dialog-media img.loaded{opacity:1}
+
+  .dialog-status{
+    position:absolute;
+    inset:0;
+    z-index:2;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:13px;
+    color:var(--md-on-surface-variant);
+    min-height:220px;
+  }
+  .dialog-status[hidden]{display:none}
+  .dialog-status.error{color:var(--md-primary);padding:0 24px;text-align:center}
+
+  .dialog-bottom{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-top:14px;
+    padding:2px 2px 0;
+    flex-wrap:wrap;
+  }
+
+  .dialog-title{
+    font-size:17px;
+    font-weight:650;
+    color:var(--md-on-surface);
+  }
+
+  .dialog-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .icon-btn{
+    width:44px;
+    height:44px;
+    border-radius:var(--shape-lg);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(157,176,109,.10);
+    border:1px solid rgba(190,205,151,.12);
+    color:var(--md-on-surface);
+    cursor:pointer;
+    transition:background .2s ease,transform .18s var(--spring),border-radius .3s var(--spring);
+  }
+
+  .icon-btn:hover{
+    background:var(--md-secondary-container);
+    border-radius:var(--shape-lg);
+  }
+  .icon-btn:active{transform:scale(.9)}
+  .icon-btn svg{width:19px;height:19px}
+
+  .filled-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:var(--md-primary);
+    color:var(--md-on-primary);
+    padding:12px 20px;
+    border-radius:var(--shape-lg);
+    font-weight:700;
+    font-size:14px;
+    cursor:pointer;
+    transition:filter .2s ease,transform .15s var(--spring),border-radius .3s var(--spring);
+  }
+  .filled-btn:hover{
+    filter:brightness(1.05);
+    border-radius:var(--shape-lg);
+  }
+  .filled-btn:active{transform:scale(.95)}
+  .filled-btn svg{width:17px;height:17px}
+
+  button:focus-visible{
+    outline:2px solid var(--md-primary);
+    outline-offset:3px;
+  }
+
+
+  .site-footer{
+    width:min(1440px,calc(100% - 36px));
+    margin:0 auto;
+    padding:0 0 42px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    text-align:center;
+  }
+
+  .footer-message{
+    margin:0;
+    color:var(--md-on-surface-variant);
+    font-size:14px;
+    font-style:italic;
+    line-height:1.4;
+  }
+
+  .github-star{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    color:var(--md-on-surface);
+    font-size:14px;
+    font-weight:700;
+    text-decoration:none;
+    transition:color .2s ease,transform .2s var(--spring);
+  }
+
+  .github-star:hover{
+    color:var(--md-primary);
+    transform:translateY(-2px);
+  }
+
+  .github-star svg{
+    width:18px;
+    height:18px;
+    flex:0 0 auto;
+    fill:currentColor;
+  }
+
+  @media (max-width:900px){
+    .grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+    .card{height:320px}
+  }
+
+  @media (max-width:640px){
+    .topbar{
+      top:10px;
+      width:calc(100% - 20px);
+      margin:10px auto 20px;
+      padding:13px;
+      border-radius:var(--shape-lg);
+    }
+
+    .brand-mark{width:44px;height:44px;border-radius:var(--shape-lg)}
+    .brand-mark svg{width:21px;height:21px;display:block}
+    h1{font-size:25px}
+    .subtitle{max-width:58vw;font-size:12px}
+
+    .eyebrow-chip{display:none}
+
+    .grid{
+      width:calc(100% - 20px);
+      grid-template-columns:1fr;
+      gap:12px;
+      padding-bottom:120px;
+    }
+
+    .card,.skeleton{
+      height:auto;
+      aspect-ratio:16 / 9;
+      max-height:none;
+    }
+    .card-overlay{opacity:1;transform:none}
+
+    .fab{
+      right:14px;
+      bottom:14px;
+      padding:15px;
+      border-radius:var(--shape-lg);
+    }
+    .fab .fab-label{display:none}
+
+    .dialog{
+      padding:10px;
+      border-radius:var(--shape-lg);
+    }
+    .dialog-bottom{flex-direction:column;align-items:stretch}
+    .dialog-actions{justify-content:space-between}
+    .filled-btn{flex:1;justify-content:center}
+  }
+
+  /* Mobile performance: avoid expensive fixed blur/backdrop-filter layers and
+     continuous card animations on phones. The wallpaper cards themselves remain
+     visually unchanged, but scrolling requires far less GPU work. */
+  @media (max-width:640px){
+    body{
+      background:linear-gradient(145deg,#0b0d0a,#151912 48%,#090b08);
+    }
+
+    .ambient-bg, .ambient-scrim{
+      display:none;
+    }
+
+    .topbar{
+      backdrop-filter:none;
+      -webkit-backdrop-filter:none;
+      background:rgba(18,21,15,.96);
+    }
+
+    .card{
+      opacity:1;
+      transform:none;
+      transition:box-shadow .2s ease,border-radius .2s ease;
+      content-visibility:auto;
+      contain:layout paint style;
+      contain-intrinsic-size:auto 210px;
+    }
+
+    .card:hover,.card:focus-visible{
+      transform:none;
+    }
+
+    .card:hover img{
+      transform:none;
+      filter:none;
+    }
+
+    .card img{
+      transition:none;
+    }
+
+    .scrim{
+      backdrop-filter:none;
+      -webkit-backdrop-filter:none;
+      background:rgba(20,23,15,.90);
+    }
+
+    .dialog{
+      backdrop-filter:none;
+      -webkit-backdrop-filter:none;
+      background:rgba(52,58,41,.98);
+    }
+
+    .dialog-media::before{
+      display:none;
+    }
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{
+      animation:none !important;
+      transition:none !important;
+      scroll-behavior:auto !important;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="ambient-bg" id="ambientBg" aria-hidden="true"></div>
+  <div class="ambient-scrim" aria-hidden="true"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg width="25" height="25" aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M19.0993 10.6602C20.2113 11.9744 19.98 13.5815 19.9801 15C19.9801 18.9062 14.7132 20 12 20C9.28677 20 4.01994 18.9062 4.01994 15C4.01995 13.5815 3.78875 11.9744 4.90066 10.6602M19.0993 10.6602C18.9048 10.4303 18.6692 10.2094 18.384 10M19.0993 10.6602C19.7993 11.0634 19.9781 9.55469 19.9801 9.0625V7.18761C19.9801 5.56261 18.8629 5.00011 17.9053 5.00011C16.9477 5.00011 15.0324 6.5625 14.394 6.5625C13.6279 6.5625 13.4804 6.40636 12 6.40636C10.5197 6.40636 10.3721 6.5625 9.60601 6.5625C8.9676 6.5625 7.05236 5 6.09476 5C5.13715 5 4.01995 5.5625 4.01995 7.1875V9.0625C4.02188 9.55469 4.20072 11.0634 4.90066 10.6602M4.90066 10.6602C5.09519 10.4303 5.33082 10.2094 5.61599 10" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M12.8258 16C12.8258 16.1726 12.4647 16.3125 12.0193 16.3125C11.574 16.3125 11.2129 16.1726 11.2129 16C11.2129 15.8274 11.574 15.6875 12.0193 15.6875C12.4647 15.6875 12.8258 15.8274 12.8258 16Z" stroke="#000000" stroke-width="1.5"/>
+<path d="M15.5 13.5938C15.5 14.0252 15.2834 14.375 15.0161 14.375C14.7489 14.375 14.5323 14.0252 14.5323 13.5938C14.5323 13.1623 14.7489 12.8125 15.0161 12.8125C15.2834 12.8125 15.5 13.1623 15.5 13.5938Z" stroke="#000000" stroke-width="1.5"/>
+<path d="M9.5 13.5938C9.5 14.0252 9.28336 14.375 9.01613 14.375C8.74889 14.375 8.53226 14.0252 8.53226 13.5938C8.53226 13.1623 8.74889 12.8125 9.01613 12.8125C9.28336 12.8125 9.5 13.1623 9.5 13.5938Z" stroke="#000000" stroke-width="1.5"/>
+<path d="M22.0004 15.4688C21.5165 15.1562 19.4197 14.375 18.6133 14.375" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M20.3871 17.9688C19.9033 17.6562 18.7742 16.875 17.9678 16.875" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M2 15.4688C2.48387 15.1562 4.58065 14.375 5.3871 14.375" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M3.61279 17.9688C4.09667 17.6562 5.2257 16.875 6.03215 16.875" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
+      </div>
+      <div class="brand-copy">
+        <h1>Blapples Wallpaper Collection</h1>
+        <p class="subtitle" id="subtitle">maomao 😾</p>
+      </div>
+    </div>
+
+    <span class="eyebrow-chip">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2-6.3-4.6-6.3 4.6 2.3-7.2-6-4.6h7.6z"/></svg>
+      Curated gallery
+    </span>
+  </header>
+  <main class="grid" id="grid"></main>
+
+
+  <footer class="site-footer">
+    <p class="footer-message">More goated walls to come</p>🐱
+    <a class="github-star"
+       href="https://github.com/Blapples/wallpapers"
+       target="_blank"
+       rel="noopener noreferrer"
+       aria-label="Give this repo a star on GitHub">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 .8a11.2 11.2 0 0 0-3.54 21.83c.56.1.77-.24.77-.54v-2.1c-3.14.68-3.8-1.33-3.8-1.33-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 1.72 2.62 1.22 3.26.93.1-.73.39-1.22.71-1.5-2.51-.29-5.15-1.26-5.15-5.6 0-1.24.44-2.25 1.16-3.04-.12-.29-.5-1.44.11-3 0 0 .95-.3 3.1 1.16a10.7 10.7 0 0 1 5.64 0c2.15-1.46 3.1-1.16 3.1-1.16.61 1.56.23 2.71.11 3 .72.79 1.16 1.8 1.16 3.04 0 4.35-2.65 5.31-5.17 5.59.4.35.76 1.04.76 2.1v3.11c0 .3.2.65.78.54A11.2 11.2 0 0 0 12 .8Z"/>
+      </svg>
+      <span>Give this repo a star</span>
+    </a>
+  </footer>
+
+  <button class="fab" id="surpriseBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+    <span class="fab-label">Surprise me</span>
+  </button>
+
+  <div class="scrim" id="lightbox" hidden>
+    <div class="dialog">
+      <div class="dialog-top">
+        <span class="dialog-count" id="lbCount">1 / 1</span>
+        <button class="icon-btn" id="lbClose" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+        </button>
+      </div>
+      <div class="dialog-media">
+        <div class="dialog-status" id="lbStatus">Loading…</div>
+        <img id="lbImg" alt="" />
+      </div>
+      <div class="dialog-bottom">
+        <div class="dialog-title" id="lbTitle">—</div>
+        <div class="dialog-actions">
+          <button class="icon-btn" id="lbPrev" aria-label="Previous">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg>
+          </button>
+          <button class="icon-btn" id="lbNext" aria-label="Next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+          </button>
+          <button class="filled-btn" id="lbDownload">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M4 19h16"/></svg>
+            Download
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ---------- Preview protection ---------- */
+// Wallpapers can only be saved through the site's Download button.
+// Disable the browser context menu and native image dragging across the page.
+document.addEventListener('contextmenu', event => event.preventDefault());
+document.addEventListener('dragstart', event => {
+  if(event.target instanceof HTMLImageElement || event.target.closest?.('.card, .dialog-media')){
+    event.preventDefault();
+  }
+});
+
+/* ---------- Wallpaper source ----------
+   Every image in this GitHub repo path shows up automatically — upload a
+   file there and it appears here on next page load, no code changes. ---- */
+const GITHUB_SOURCE = {
+  user:   'Blapples',
+  repo:   'wallpapers',
+  path:   '',       // '' = repo root
+  branch: 'main',
+};
+
+function titleFromFilename(name){
+  return name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/*
+ * The GitHub file is always kept as the ORIGINAL source.
+ * Cards and the lightbox use resized/compressed preview URLs so opening the
+ * gallery never forces a phone/tablet/PC to download a huge wallpaper.
+ * The original GitHub URL is used only when the user presses Download.
+ *
+ * wsrv.nl is an image-resizing proxy: it fetches the public GitHub image,
+ * resizes it server-side, and returns a much smaller image.
+ */
+const PREVIEW_PROXY = 'https://wsrv.nl/';
+const PREVIEW_QUALITY = 72;
+
+// Phones do not need desktop-sized preview assets. Keeping these smaller
+// reduces network transfer, image decoding, memory use, and GPU texture size.
+const IS_MOBILE_DEVICE = window.matchMedia('(max-width: 640px)').matches ||
+  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+const CARD_PREVIEW_WIDTH = IS_MOBILE_DEVICE ? 640 : 960;
+const LIGHTBOX_PREVIEW_WIDTH = IS_MOBILE_DEVICE ? 1080 : 1600;
+
+function makePreviewUrl(originalUrl, width){
+  if(!originalUrl || originalUrl.startsWith('data:') || originalUrl.startsWith('blob:')){
+    return originalUrl;
+  }
+  return `${PREVIEW_PROXY}?url=${encodeURIComponent(originalUrl)}&w=${width}&q=${PREVIEW_QUALITY}&fit=inside&output=webp`;
+}
+
+function normalizeFrame(frame){
+  if(!frame || typeof frame !== 'object') return frame;
+  if(!frame.src) return frame;
+  frame.previewSrc = frame.previewSrc || makePreviewUrl(frame.src, CARD_PREVIEW_WIDTH);
+  frame.lightboxSrc = frame.lightboxSrc || makePreviewUrl(frame.src, LIGHTBOX_PREVIEW_WIDTH);
+  return frame;
+}
+
+async function fetchWallpapersFromGitHub(src){
+  const apiUrl = `https://api.github.com/repos/${src.user}/${src.repo}/contents/${src.path}?ref=${src.branch}`;
+  const res = await fetch(apiUrl, { headers:{ Accept:'application/vnd.github+json' } });
+  if(!res.ok) throw new Error(`GitHub API responded ${res.status}`);
+  const files = await res.json();
+  if(!Array.isArray(files)) throw new Error('Unexpected GitHub API response');
+  const imageExt = /\.(png|jpe?g|webp|gif)$/i;
+  return files
+    .filter(f => f.type === 'file' && imageExt.test(f.name))
+    .sort((a,b) => a.name.localeCompare(b.name))
+    .map((f, i) => {
+      const originalUrl = f.download_url;
+      return normalizeFrame({
+        title: titleFromFilename(f.name),
+        src: originalUrl,
+        previewSrc: makePreviewUrl(originalUrl, CARD_PREVIEW_WIDTH),
+        lightboxSrc: makePreviewUrl(originalUrl, LIGHTBOX_PREVIEW_WIDTH),
+        filename: f.name,
+        frameNo: i + 1,
+      });
+    });
+}
+
+/* ---------- Placeholder art (used only if the repo fetch fails) ---------- */
+function hexToRgb(hex){ const n=parseInt(hex.replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function hexToRgba(hex,a){ const [r,g,b]=hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; }
+
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ seed>>>15, 1 | seed);
+    t = t + Math.imul(t ^ t>>>7, 61 | t) ^ t;
+    return ((t ^ t>>>14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20260815);
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j = Math.floor(rand()*(i+1));
+    [arr[i],arr[j]] = [arr[j],arr[i]];
+  }
+  return arr;
+}
+
+const FAMILIES = [
+  { bg:'#2a1607', colors:['#ffb68c','#7c3900','#e8c36e'], titles:['Warm Horizon','Amber Field','Coral Fade'] },
+  { bg:'#06231c', colors:['#7bd9c0','#005141','#ffb68c'], titles:['Deep Teal','Cool Current','Seafoam'] },
+  { bg:'#241a05', colors:['#e8c36e','#7c3900','#7bd9c0'], titles:['Golden Hour','Honey Light','Dust & Gold'] },
+  { bg:'#170c1c', colors:['#c79ce8','#7bd9c0','#ffb68c'], titles:['Violet Bloom','Twilight Fade','Soft Static'] },
+  { bg:'#0a1622', colors:['#7eb3e8','#7bd9c0','#e8c36e'], titles:['Cold Fathom','Blue Hour','Clear Sky'] },
+  { bg:'#220a12', colors:['#f28fa3','#ffb68c','#e8c36e'], titles:['Rosewater','Petal Static','Warm Bloom'] },
+];
+
+function paintWallpaper(ctx,w,h,family){
+  ctx.fillStyle = family.bg;
+  ctx.fillRect(0,0,w,h);
+  const blobCount = 3 + Math.floor(rand()*2);
+  for(let i=0;i<blobCount;i++){
+    const hex = family.colors[i % family.colors.length];
+    const cx = rand()*w, cy = rand()*h;
+    const r = (0.4 + rand()*0.4) * Math.max(w,h);
+    const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    grad.addColorStop(0, hexToRgba(hex,0.95));
+    grad.addColorStop(1, hexToRgba(hex,0));
+    ctx.globalCompositeOperation = i===0 ? 'source-over' : 'lighten';
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,w,h);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  const vgrad = ctx.createRadialGradient(w/2,h/2,h*0.15,w/2,h/2,h*0.8);
+  vgrad.addColorStop(0,'rgba(0,0,0,0)');
+  vgrad.addColorStop(1,'rgba(0,0,0,0.4)');
+  ctx.fillStyle = vgrad;
+  ctx.fillRect(0,0,w,h);
+}
+function buildPlaceholderFrames(){
+  const list = [];
+  FAMILIES.forEach(family=>{ family.titles.forEach(title=>{ list.push({ title, family }); }); });
+  shuffle(list);
+  list.forEach((f,i)=> f.frameNo = i+1);
+  return list;
+}
+
+/* ---------- Build the grid ---------- */
+const W = 480, H = 360;
+const pad = n => String(n).padStart(2,'0');
+const slugify = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+const grid = document.getElementById('grid');
+const frameData = {};
+
+/*
+ * Keep a small local copy of the GitHub wallpaper manifest.
+ *
+ * This is important when the HTML file is opened directly from disk
+ * (file://). Browsers can occasionally block, delay, or rate-limit the
+ * GitHub API on a refresh. Previously the page waited for that request
+ * before building the cards, so a refresh could leave an empty gallery.
+ *
+ * The cache lets the last successfully loaded wallpaper list render
+ * immediately, while GitHub is refreshed quietly in the background.
+ */
+const WALLPAPER_CACHE_KEY = 'blapples-wallpaper-manifest-v2';
+
+function readWallpaperCache(){
+  try{
+    const raw = localStorage.getItem(WALLPAPER_CACHE_KEY);
+    if(!raw) return null;
+    const data = JSON.parse(raw);
+    if(!Array.isArray(data) || !data.length) return null;
+    return data.filter(item =>
+      item &&
+      typeof item.title === 'string' &&
+      typeof item.src === 'string' &&
+      typeof item.filename === 'string'
+    ).map(normalizeFrame);
+  }catch(err){
+    console.warn('Wallpaper cache could not be read:', err);
+    return null;
+  }
+}
+
+function writeWallpaperCache(frames){
+  try{
+    const clean = frames.map(frame => ({
+      title: frame.title,
+      src: frame.src,
+      previewSrc: frame.previewSrc || makePreviewUrl(frame.src, CARD_PREVIEW_WIDTH),
+      lightboxSrc: frame.lightboxSrc || makePreviewUrl(frame.src, LIGHTBOX_PREVIEW_WIDTH),
+      filename: frame.filename,
+      frameNo: frame.frameNo
+    }));
+    localStorage.setItem(WALLPAPER_CACHE_KEY, JSON.stringify(clean));
+  }catch(err){
+    // Storage can be unavailable in private/file contexts; the gallery
+    // still works without it.
+    console.warn('Wallpaper cache could not be written:', err);
+  }
+}
+
+let renderGeneration = 0;
+
+function renderFrames(frames, usingPlaceholders=false){
+  // Invalidate any chunked render that is still scheduled from a previous
+  // manifest. Without this, a background GitHub refresh could race the
+  // cached render and leave a partially mixed gallery.
+  renderGeneration++;
+  const generation = renderGeneration;
+  grid.innerHTML = '';
+  Object.keys(frameData).forEach(key => delete frameData[key]);
+  buildCardsChunked(frames, usingPlaceholders, IS_MOBILE_DEVICE ? 6 : 12, generation);
+
+  if(frames[0]?.src){
+    const ambientSrc = frames[0].previewSrc || makePreviewUrl(frames[0].src, CARD_PREVIEW_WIDTH);
+    document.getElementById('ambientBg').style.backgroundImage =
+      `url("${ambientSrc}")`;
+  }
+}
+
+
+const revealObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(entry=>{
+    if(entry.isIntersecting){
+      entry.target.classList.add('visible');
+      revealObserver.unobserve(entry.target);
+    }
+  });
+}, { rootMargin:'120px 0px', threshold:0.05 });
+
+function renderSkeletons(count){
+  const frag = document.createDocumentFragment();
+  for(let i=0;i<count;i++){
+    const sk = document.createElement('div');
+    sk.className = 'skeleton';
+    frag.appendChild(sk);
+  }
+  grid.appendChild(frag);
+}
+
+function buildCard(frame, idx, usingPlaceholders){
+  if(usingPlaceholders){
+    const canvas = document.createElement('canvas');
+    canvas.width=W; canvas.height=H;
+    const ctx = canvas.getContext('2d');
+    paintWallpaper(ctx, W, H, frame.family);
+    frame.src = canvas.toDataURL('image/png');
+    frame.previewSrc = frame.src;
+    frame.lightboxSrc = frame.src;
+    frame.filename = `${slugify(frame.title)}-${pad(frame.frameNo)}.png`;
+  }
+  frameData[frame.frameNo] = frame;
+
+  const card = document.createElement('button');
+  card.className = 'card';
+  card.dataset.id = frame.frameNo;
+  card.setAttribute('aria-label', `Open ${frame.title}`);
+
+  const img = document.createElement('img');
+  img.alt = frame.title;
+  img.loading = 'lazy';
+  img.decoding = 'async';
+  img.fetchPriority = idx < (IS_MOBILE_DEVICE ? 2 : 4) ? 'high' : 'low';
+
+  // Attach the listener BEFORE assigning src. This is important because
+  // cached images can finish loading immediately.
+  frame._img = img;
+
+  img.addEventListener('load', ()=>{
+    frame.width = img.naturalWidth;
+    frame.height = img.naturalHeight;
+
+  }, { once:true });
+
+  // Use only the resized preview for the gallery. The original `frame.src`
+  // is intentionally never assigned to the card image.
+  img.src = frame.previewSrc || makePreviewUrl(frame.src, CARD_PREVIEW_WIDTH);
+
+  if(img.complete && img.naturalWidth){
+    frame.width = img.naturalWidth;
+    frame.height = img.naturalHeight;
+    // These helpers existed in an earlier filter version of the gallery.
+    // Guard them so an already-cached image can never abort card creation
+    // during a browser refresh.
+    if(typeof resolutionKey === 'function'){
+      frame.resolution = resolutionKey(img.naturalWidth, img.naturalHeight);
+    }
+    if(typeof rebuildResolutionFilters === 'function'){
+      rebuildResolutionFilters();
+    }
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'card-overlay';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'card-title';
+  titleEl.textContent = frame.title;
+  overlay.appendChild(titleEl);
+
+  card.append(img, overlay);
+  card.addEventListener('click', ()=> openLightbox(frame.frameNo));
+  grid.appendChild(card);
+  revealObserver.observe(card);
+}
+
+function buildCardsChunked(frames, usingPlaceholders, chunkSize=12, generation=renderGeneration){
+  let i = 0;
+  function step(){
+    // Stop immediately if another render has replaced this manifest.
+    if(generation !== renderGeneration) return;
+    const end = Math.min(i + chunkSize, frames.length);
+    for(; i < end; i++){
+      if(generation !== renderGeneration) return;
+      buildCard(frames[i], i, usingPlaceholders);
+    }
+    if(i < frames.length) requestAnimationFrame(step);
+  }
+  step();
+}
+
+renderSkeletons(12);
+
+async function init(){
+  // Render the last known wallpaper list immediately. This makes refreshes
+  // reliable even when the GitHub API is temporarily unavailable.
+  const cachedFrames = readWallpaperCache();
+
+  if(cachedFrames?.length){
+    renderFrames(cachedFrames);
+  }
+
+  // Always try to refresh the manifest in the background so newly added
+  // wallpapers still appear without requiring the user to reopen the file.
+  try{
+    const freshFrames = await fetchWallpapersFromGitHub(GITHUB_SOURCE);
+    if(!freshFrames.length) throw new Error('No images found in that repo/path');
+
+    // Never replace a known-good manifest with a transiently incomplete
+    // API response. Match wallpapers by filename so ordering/indices cannot
+    // make one card disappear between refreshes.
+    const known = cachedFrames || [];
+    const freshByFile = new Map(freshFrames.map(frame => [frame.filename, frame]));
+
+    let finalFrames = freshFrames;
+    if(known.length && freshFrames.length < known.length){
+      const missingKnown = known.filter(frame => !freshByFile.has(frame.filename));
+      if(missingKnown.length){
+        console.warn(`GitHub returned ${freshFrames.length} wallpapers; preserving ${missingKnown.length} cached wallpaper(s) until the manifest is complete.`);
+        finalFrames = [...freshFrames, ...missingKnown]
+          .sort((a,b) => a.filename.localeCompare(b.filename))
+          .map((frame, index) => ({...frame, frameNo:index + 1}));
+      }
+    }
+
+    // Re-number after merging so frame IDs are always unique and stable for
+    // the current render.
+    finalFrames = finalFrames.map((frame, index) => ({...frame, frameNo:index + 1}));
+    writeWallpaperCache(finalFrames);
+    renderFrames(finalFrames);
+  }catch(err){
+    console.warn('Could not refresh wallpapers from GitHub:', err.message);
+
+    // If there is no cache yet, use the built-in placeholders instead of
+    // leaving the gallery empty.
+    if(!cachedFrames?.length){
+      const fallbackFrames = buildPlaceholderFrames();
+      renderFrames(fallbackFrames, true);
+    }
+  }
+
+  // Keep the custom collection subtitle.
+  document.getElementById('subtitle').textContent = 'maomao 😾';
+}
+init();
+
+/* ---------- Surprise me ---------- */
+document.getElementById('surpriseBtn').addEventListener('click', ()=>{
+  const cards = Array.from(grid.querySelectorAll('.card')).filter(card=>!card.hidden);
+  if(!cards.length) return;
+  const pick = cards[Math.floor(Math.random()*cards.length)];
+  pick.scrollIntoView({ behavior:'smooth', block:'center' });
+  pick.classList.add('pulse');
+  setTimeout(()=>{
+    pick.classList.remove('pulse');
+    openLightbox(pick.dataset.id);
+  }, 500);
+});
+
+/* ---------- Lightbox ---------- */
+const lightbox = document.getElementById('lightbox');
+const lbImg = document.getElementById('lbImg');
+const lbStatus = document.getElementById('lbStatus');
+const lbTitle = document.getElementById('lbTitle');
+const lbCount = document.getElementById('lbCount');
+const lbDownload = document.getElementById('lbDownload');
+let currentIndex = -1;
+
+function getPool(){ return Array.from(grid.querySelectorAll('.card')); }
+
+function openLightbox(id){
+  const pool = getPool();
+  if(!pool.length) return;
+  const found = pool.findIndex(el=>el.dataset.id === String(id));
+  currentIndex = found===-1 ? 0 : found;
+  lightbox.hidden = false;
+  document.body.style.overflow = 'hidden';
+  renderLightbox(pool);
+}
+function renderLightbox(pool){
+  const el = pool[currentIndex];
+  const frame = frameData[el.dataset.id];
+
+  lbImg.loading = 'eager';
+  lbImg.decoding = 'async';
+  lbImg.classList.remove('loaded');
+  lbStatus.hidden = false;
+  lbStatus.classList.remove('error');
+  lbStatus.textContent = 'Loading…';
+  lbImg.onload = ()=>{ lbImg.classList.add('loaded'); lbStatus.hidden = true; };
+  lbImg.onerror = ()=>{
+    lbStatus.classList.add('error');
+    lbStatus.textContent = "Couldn't load this image — try Download instead, or open it directly on GitHub.";
+  };
+  // The lightbox gets a larger optimized preview, not the original.
+  // This keeps large 4K/8K wallpapers fast to open while preserving the
+  // original URL for the Download button.
+  lbImg.src = frame.lightboxSrc || makePreviewUrl(frame.src, LIGHTBOX_PREVIEW_WIDTH);
+  lbImg.alt = frame.title;
+
+  lbTitle.textContent = frame.title;
+  lbCount.textContent = `${currentIndex+1} / ${pool.length}`;
+  lbDownload.onclick = ()=> downloadFrame(frame);
+}
+function closeLightbox(){
+  lightbox.hidden = true;
+  document.body.style.overflow = '';
+}
+function stepLightbox(delta){
+  const pool = getPool();
+  if(!pool.length) return;
+  currentIndex = (currentIndex + delta + pool.length) % pool.length;
+  renderLightbox(pool);
+}
+document.getElementById('lbClose').addEventListener('click', closeLightbox);
+document.getElementById('lbPrev').addEventListener('click', ()=>stepLightbox(-1));
+document.getElementById('lbNext').addEventListener('click', ()=>stepLightbox(1));
+lightbox.addEventListener('click', e=>{ if(e.target === lightbox) closeLightbox(); });
+document.addEventListener('keydown', e=>{
+  if(lightbox.hidden) return;
+  if(e.key==='Escape') closeLightbox();
+  if(e.key==='ArrowLeft') stepLightbox(-1);
+  if(e.key==='ArrowRight') stepLightbox(1);
+});
+
+/* ---------- Download ---------- */
+async function downloadFrame(frame){
+  try{
+    let href = frame.src;
+    if(!href.startsWith('data:') && !href.startsWith('blob:')){
+      const res = await fetch(href, { mode:'cors' });
+      const blob = await res.blob();
+      href = URL.createObjectURL(blob);
+    }
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = frame.filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }catch(err){
+    window.open(frame.src, '_blank');
+  }
+}
+</script>
+</body>
+</html>
