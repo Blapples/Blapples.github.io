@@ -479,6 +479,93 @@
     color:var(--md-on-surface);
   }
 
+  /* ---------- "New" badge + New Wallpapers section ----------
+     A wallpaper counts as new for 7 days after this browser first notices
+     it (tracked client-side — see trackNewWallpapers in the script). The
+     badge shows on the card wherever it appears; the dedicated section
+     further down is just a shortcut to the same "new" wallpapers. */
+  .new-badge{
+    position:absolute;
+    top:10px;
+    left:10px;
+    z-index:3;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:5px 11px 5px 9px;
+    border-radius:var(--shape-full);
+    background:var(--md-primary);
+    color:var(--md-on-primary);
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    box-shadow:var(--elev-2);
+    pointer-events:none;
+  }
+  .new-badge::before{
+    content:"";
+    width:6px;
+    height:6px;
+    flex:0 0 auto;
+    border-radius:50%;
+    background:var(--md-on-primary);
+    animation:new-badge-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes new-badge-pulse{
+    0%,100%{opacity:1;transform:scale(1)}
+    50%{opacity:.4;transform:scale(.7)}
+  }
+
+  .new-section{
+    width:min(1440px,calc(100% - 36px));
+    margin:-6px auto 40px;
+  }
+  .new-section[hidden]{display:none}
+
+  .new-section-head{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+    margin:0 0 16px;
+    padding:0 2px;
+  }
+  .new-section-title{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    margin:0;
+    font-size:19px;
+    font-weight:700;
+    letter-spacing:-.02em;
+    color:var(--md-on-surface);
+  }
+  .new-section-icon{
+    width:18px;
+    height:18px;
+    flex:0 0 auto;
+    color:var(--md-primary);
+  }
+  .new-section-sub{
+    margin:0;
+    font-size:13px;
+    color:var(--md-on-surface-variant);
+  }
+
+  .new-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(270px,1fr));
+    gap:18px;
+  }
+
+  @media (max-width:900px){
+    .new-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .new-badge::before{animation:none}
+  }
+
   /* ---------- Viewport-based image loading ---------- */
 /*
  * Images are only assigned their real source when they are close to the
@@ -989,6 +1076,9 @@
       padding-bottom:120px;
     }
 
+    .new-section{width:calc(100% - 20px);margin:-4px auto 32px}
+    .new-grid{grid-template-columns:1fr;gap:12px}
+
     .card,.skeleton{
       height:auto;
       aspect-ratio:16 / 9;
@@ -1146,6 +1236,16 @@
 
   <main class="grid" id="grid"></main>
 
+  <section class="new-section" id="newSection" hidden>
+    <div class="new-section-head">
+      <h2 class="new-section-title">
+        <svg class="new-section-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2-6.3-4.6-6.3 4.6 2.3-7.2-6-4.6h7.6z"/></svg>
+        New Wallpapers
+      </h2>
+      <p class="new-section-sub">Uploaded in the last 7 days</p>
+    </div>
+    <div class="new-grid" id="newGrid"></div>
+  </section>
 
   <footer class="site-footer">
     <p class="footer-message">More goated walls to come</p>🐱
@@ -1551,6 +1651,89 @@ function writeWallpaperCache(frames){
     // still works without it.
     console.warn('Wallpaper cache could not be written:', err);
   }
+}
+
+/* ---------- "New" wallpaper tracking ----------
+ * There's no backend, so "new" is tracked the same way the manifest cache
+ * above already is: locally, per browser, keyed by filename. The first
+ * time this code ever runs, the current collection becomes the baseline
+ * (nothing is "new" yet, so shipping this feature doesn't badge every
+ * existing wallpaper). After that, any filename this browser hasn't seen
+ * before is stamped with the current time and counts as new for
+ * NEW_WINDOW_MS - after which it quietly goes back to being a normal
+ * card with no badge, in its normal spot in the main grid.
+ */
+const NEW_TRACKING_KEY = 'blapples-wallpaper-first-seen-v1';
+const NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
+
+function readFirstSeenMap(){
+  try{
+    const raw = localStorage.getItem(NEW_TRACKING_KEY);
+    if(!raw) return null;
+    const data = JSON.parse(raw);
+    return (data && typeof data === 'object') ? data : null;
+  }catch(err){
+    console.warn('New-wallpaper tracking could not be read:', err);
+    return null;
+  }
+}
+
+function writeFirstSeenMap(map){
+  try{
+    localStorage.setItem(NEW_TRACKING_KEY, JSON.stringify(map));
+  }catch(err){
+    console.warn('New-wallpaper tracking could not be written:', err);
+  }
+}
+
+/*
+ * Stamps each frame with firstSeenAt/isNew. The `isAuthoritative` flag
+ * matters because init() renders twice: once from the (possibly stale or
+ * incomplete) local cache for an instant paint, then again once the live
+ * GitHub listing comes back. Only the live listing is allowed to decide
+ * "this browser has never seen this file before" and write that decision
+ * to storage - otherwise a stale cache on a fresh browser could wrongly
+ * treat older wallpapers as brand new just because they were missing from
+ * that cache.
+ */
+function trackNewWallpapers(frames, isAuthoritative=true){
+  const now = Date.now();
+  let map = readFirstSeenMap();
+
+  if(!isAuthoritative){
+    frames.forEach(frame=>{
+      const firstSeenAt = frame.filename ? map?.[frame.filename] : undefined;
+      frame.firstSeenAt = firstSeenAt;
+      frame.isNew = firstSeenAt != null && (now - firstSeenAt) < NEW_WINDOW_MS;
+    });
+    return frames;
+  }
+
+  const isBootstrap = !map;
+  if(!map) map = {};
+
+  const seenFilenames = new Set();
+  frames.forEach(frame=>{
+    if(!frame.filename) return;
+    seenFilenames.add(frame.filename);
+    if(!(frame.filename in map)){
+      // Brand new to this browser's tracking. On the very first run ever
+      // (no stored map at all) back-date it so the existing collection
+      // doesn't suddenly launch as "new"; otherwise stamp it with now.
+      map[frame.filename] = isBootstrap ? (now - NEW_WINDOW_MS - 1) : now;
+    }
+    const firstSeenAt = map[frame.filename];
+    frame.firstSeenAt = firstSeenAt;
+    frame.isNew = (now - firstSeenAt) < NEW_WINDOW_MS;
+  });
+
+  // Forget wallpapers that no longer exist in the repo so this can't grow forever.
+  Object.keys(map).forEach(filename=>{
+    if(!seenFilenames.has(filename)) delete map[filename];
+  });
+
+  writeFirstSeenMap(map);
+  return frames;
 }
 
 /*
@@ -1959,15 +2142,73 @@ async function computeAllFrameColors(frames, generation){
 }
 let renderGeneration = 0;
 
-function renderFrames(frames, usingPlaceholders=false){
+/* ---------- New Wallpapers section ----------
+ * A second, smaller set of cards for whichever wallpapers trackNewWallpapers
+ * marked isNew. These are separate DOM elements from the main grid's cards
+ * (the simplest way to show the same wallpaper in two places), but clicking
+ * one opens the exact same lightbox/pool as the main grid, keyed off the
+ * shared frame.frameNo id - so prev/next still walks the full collection.
+ */
+const newSection = document.getElementById('newSection');
+const newGrid = document.getElementById('newGrid');
+
+function buildNewBadge(){
+  const badge = document.createElement('span');
+  badge.className = 'new-badge';
+  badge.textContent = 'New';
+  badge.setAttribute('aria-hidden', 'true');
+  return badge;
+}
+
+function buildNewSectionCard(frame){
+  const card = document.createElement('button');
+  card.className = 'card new-card';
+  card.dataset.id = frame.frameNo;
+  card.setAttribute('aria-label', `Open ${frame.title} (added this week)`);
+
+  const img = document.createElement('img');
+  img.alt = frame.title;
+  img.src = frame.previewSrc || makePreviewUrl(frame.src, CARD_PREVIEW_WIDTH);
+  prepareCardImage(img);
+
+  card.append(img, buildNewBadge());
+  card.addEventListener('click', ()=> openLightbox(frame.frameNo));
+  observeCardReveal(card);
+  return card;
+}
+
+function renderNewSection(frames){
+  if(!newSection || !newGrid) return;
+  const newFrames = frames.filter(frame => frame.isNew);
+
+  newGrid.innerHTML = '';
+  if(!newFrames.length){
+    newSection.hidden = true;
+    return;
+  }
+
+  newSection.hidden = false;
+  const frag = document.createDocumentFragment();
+  newFrames.forEach(frame => frag.appendChild(buildNewSectionCard(frame)));
+  newGrid.appendChild(frag);
+}
+
+function renderFrames(frames, usingPlaceholders=false, isAuthoritative=true){
   // Invalidate any chunked render that is still scheduled from a previous
   // manifest. Without this, a background GitHub refresh could race the
   // cached render and leave a partially mixed gallery.
   renderGeneration++;
   const generation = renderGeneration;
+
+  // Placeholder/demo art doesn't have real filenames yet at this point
+  // (buildCard assigns them per-card), so there's nothing to track.
+  if(!usingPlaceholders) trackNewWallpapers(frames, isAuthoritative);
+
   grid.innerHTML = '';
   Object.keys(frameData).forEach(key => delete frameData[key]);
   buildCardsChunked(frames, usingPlaceholders, IS_MOBILE_DEVICE ? 6 : 12, generation);
+
+  renderNewSection(usingPlaceholders ? [] : frames);
 
   // Reset the color filter chips for this manifest, then classify every
   // wallpaper's dominant color in the background (decoupled from lazy card
@@ -2018,7 +2259,7 @@ function buildCard(frame, idx, usingPlaceholders){
   const card = document.createElement('button');
   card.className = 'card';
   card.dataset.id = frame.frameNo;
-  card.setAttribute('aria-label', `Open ${frame.title}`);
+  card.setAttribute('aria-label', frame.isNew ? `Open ${frame.title} (added this week)` : `Open ${frame.title}`);
 
   const img = document.createElement('img');
   img.alt = frame.title;
@@ -2062,6 +2303,7 @@ function buildCard(frame, idx, usingPlaceholders){
   overlay.appendChild(titleEl);
 
   card.append(img, overlay);
+  if(frame.isNew) card.appendChild(buildNewBadge());
   card.addEventListener('click', ()=> openLightbox(frame.frameNo));
   grid.appendChild(card);
   frame._card=card;
@@ -2094,7 +2336,9 @@ async function init(){
   const cachedFrames = readWallpaperCache();
 
   if(cachedFrames?.length){
-    renderFrames(cachedFrames);
+    // Non-authoritative: the cache can be stale or incomplete, so this
+    // pass only reads existing "first seen" data, it never decides what's new.
+    renderFrames(cachedFrames, false, false);
   }
 
   // Always try to refresh the manifest in the background so newly added
@@ -2124,7 +2368,9 @@ async function init(){
     // the current render.
     finalFrames = finalFrames.map((frame, index) => ({...frame, frameNo:index + 1}));
     writeWallpaperCache(finalFrames);
-    renderFrames(finalFrames);
+    // Authoritative: this is the live GitHub listing, so it's the one
+    // allowed to stamp genuinely new filenames with today's date.
+    renderFrames(finalFrames, false, true);
   }catch(err){
     console.warn('Could not refresh wallpapers from GitHub:', err.message);
 
@@ -2143,7 +2389,8 @@ init();
 
 /* ---------- Surprise me ---------- */
 document.getElementById('surpriseBtn').addEventListener('click', ()=>{
-  const cards = Array.from(grid.querySelectorAll('.card')).filter(card=>!card.hidden);
+  const cards = Array.from(grid.querySelectorAll('.card'))
+    .filter(card=>!card.classList.contains('filter-hidden') && !card.hidden);
   if(!cards.length) return;
   const pick = cards[Math.floor(Math.random()*cards.length)];
   pick.scrollIntoView({ behavior:'smooth', block:'center' });
@@ -2163,7 +2410,13 @@ const lbCount = document.getElementById('lbCount');
 const lbDownload = document.getElementById('lbDownload');
 let currentIndex = -1;
 
-function getPool(){ return Array.from(grid.querySelectorAll('.card')); }
+function getPool(){
+  // The lightbox should follow the currently visible/filtered gallery,
+  // not the full wallpaper manifest. Color filtering marks excluded
+  // cards with .filter-hidden instead of removing them from the DOM.
+  return Array.from(grid.querySelectorAll('.card'))
+    .filter(card => !card.classList.contains('filter-hidden') && !card.hidden);
+}
 
 function openLightbox(id){
   const pool = getPool();
