@@ -751,9 +751,10 @@
   .dialog-media{
     position:relative;
     width:100%;
-    height:min(62vh, 630px);
-    min-height:0;
     aspect-ratio:16 / 9;
+    height:auto;
+    max-height:70vh;
+    min-height:0;
     display:grid;
     place-items:center;
     overflow:hidden;
@@ -780,54 +781,82 @@
     transition:background .5s ease;
   }
 
-  .dialog-media img{
+  /* ---------- Hero carousel (Material 3 "carousel" style) ----------
+     A horizontal strip of every wallpaper in the pool. The active tile is
+     shown at full size, uncropped, so nothing about the selected wallpaper
+     is cut off; every other tile is cropped to fill a shrinking "peek" card
+     based on its distance from the active one. How many peeks are visible
+     just falls out of how much width is left over — no fixed peek count.
+     The track is re-centered on the active item, but clamped so it can
+     never leave a gap: at the very first wallpaper the active tile sits
+     flush against the left edge (nothing to balance it on that side), and
+     at the very last wallpaper it sits flush against the right edge — the
+     mirror image of the start. Width and position both animate on a
+     springy, overshooting curve so switching or dragging feels bouncy
+     rather than a flat cross-fade. */
+  .wp-carousel{
     position:relative;
-    z-index:1;
-    width:auto;
-    height:auto;
-    max-width:100%;
-    max-height:100%;
-    display:block;
-    object-fit:contain;
-    opacity:0;
-    transition:opacity .25s ease;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    touch-action:pan-y;
+    cursor:grab;
   }
-.dialog-media img.loaded{opacity:1}
-
-  /* Keep every wallpaper's native aspect ratio inside the fixed lightbox.
-     In particular, square/portrait images must never stretch to fill the
-     16:9 stage. */
-  .dialog-media > #lbImg{
-    flex:none !important;
-    display:block !important;
-    width:auto !important;
-    height:auto !important;
-    max-width:100% !important;
-    max-height:100% !important;
-    min-width:0 !important;
-    min-height:0 !important;
-    aspect-ratio:auto !important;
-    object-fit:contain !important;
-    object-position:center center !important;
+  .wp-carousel.is-dragging{cursor:grabbing}
+  .wp-track{
+    display:flex;
+    align-items:center;
+    height:100%;
+    will-change:transform;
+    transition:transform .55s cubic-bezier(.22,1.6,.36,1);
+  }
+  .wp-track.is-dragging{transition:none}
+  .wp-item{
+    position:relative;
+    flex:0 0 auto;
+    height:100%;
+    margin:0 5px;
+    border-radius:20px;
+    overflow:hidden;
+    cursor:pointer;
+    background:color-mix(in srgb,var(--md-primary-container) 30%,#0a0c08 70%);
+    box-shadow:0 6px 18px rgba(0,0,0,.28);
+    transition:width .55s cubic-bezier(.22,1.6,.36,1),
+               opacity .4s ease,
+               box-shadow .3s ease;
+  }
+  .wp-item img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+    pointer-events:none;
+    -webkit-user-drag:none;
+    user-select:none;
+  }
+  /* Only the active tile shows the wallpaper uncropped (object-fit:contain) —
+     that's the one the person is actually looking at, so none of it should be
+     cut off. Neighbor tiles stay cropped-to-fill peeks, since they're just
+     hinting at what's next rather than being the focus. */
+  .wp-item.is-active{
+    box-shadow:0 16px 44px rgba(0,0,0,.46);
+  }
+  .wp-item.is-active img{
+    object-fit:contain;
+    background:#000;
+  }
+  /* Tiles outside the currently-visible set (see wpItemFraction in the
+     script below) get width:0 in JS — this collapses their margin and
+     shadow too, so they don't leave a phantom gap or sliver in the strip. */
+  .wp-item.is-hidden{
+    margin:0;
+    box-shadow:none;
+    pointer-events:none;
   }
   @media (max-width:760px){
-    .dialog-media > #lbImg{
-      width:auto !important;
-      height:auto !important;
-      max-width:100% !important;
-      max-height:100% !important;
-      object-fit:contain !important;
-    }
-  }
-
-  /* Keep the complete wallpaper visible inside the fixed lightbox stage.
-     Never enlarge the image beyond its contain bounds during navigation. */
-  .dialog-media img{
-    width:auto !important;
-    height:auto !important;
-    max-width:100% !important;
-    max-height:100% !important;
-    object-fit:contain !important;
+    .wp-item{height:100%}
   }
 
   .dialog-status{
@@ -1161,17 +1190,17 @@
   }
 
   /* Long wallpaper names: keep the action controls together and right-aligned
-     instead of letting flex-wrap drop them awkwardly to the left. */
+     instead of letting flex-wrap drop them awkwardly to the left. Titles are
+     clamped to one line here so the whole popup keeps a fixed height on
+     phones regardless of how long a given wallpaper's name is — matching
+     the desktop popup, which never resizes between wallpapers. */
   @media (max-width:760px){
     .dialog-media{
-      height:auto;
-      aspect-ratio:16 / 9;
-      min-height:0;
-    }
-    .dialog-media img{
       width:100%;
-      height:100%;
-      max-height:100%;
+      aspect-ratio:16 / 9;
+      height:auto;
+      max-height:none;
+      min-height:0;
     }
     .dialog-bottom{
       grid-template-columns:1fr;
@@ -1180,6 +1209,14 @@
     .dialog-actions{
       justify-content:flex-end;
       width:100%;
+    }
+    .dialog-title{
+      display:-webkit-box;
+      -webkit-box-orient:vertical;
+      -webkit-line-clamp:1;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:normal;
     }
   }
 
@@ -1532,14 +1569,6 @@
     100%{transform:scale(1) rotate(0)}
   }
 
-  /* Lightbox: image changes feel like a page in a carousel. */
-  .dialog-media img{
-    transform:scale(.985);
-    transition:opacity .24s ease,transform .42s cubic-bezier(.22,1.2,.36,1),filter .35s ease;
-  }
-  .dialog-media img.loaded{
-    transform:scale(1);
-  }
   .dialog-count.expressive-count{
     animation:count-pop .32s cubic-bezier(.22,1.2,.36,1);
   }
@@ -1711,9 +1740,10 @@
     color:var(--md-on-surface-variant);
     font-size:11px;
     font-weight:500;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
+    white-space:normal;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+    max-width:100%;
   }
 
   /* Small swipe hint only appears while a lightbox is open on touch devices. */
@@ -1764,7 +1794,8 @@
     .color-chip,
     .fab,
     .new-section,
-    .dialog-media img,
+    .wp-track,
+    .wp-item,
     .dialog-count,
     .expressive-snackbar{
       animation:none !important;
@@ -1864,60 +1895,6 @@
     border-color:color-mix(in srgb,var(--md-primary) 48%,transparent);
   }
 
-  /* Lightbox image motion: each navigation gets a different expressive
-     entrance so repeated next/previous presses don't feel mechanical. */
-  .dialog-media.lb-motion{
-    overflow:hidden;
-  }
-
-  .dialog-media.lb-motion .dialog-media-img{
-    animation-duration:.36s;
-    animation-timing-function:cubic-bezier(.22,1.1,.36,1);
-    animation-fill-mode:both;
-  }
-
-  .dialog-media.lb-motion.motion-1 .dialog-media-img{
-    animation-name:lb-spring-left;
-  }
-  .dialog-media.lb-motion.motion-2 .dialog-media-img{
-    animation-name:lb-spring-right;
-  }
-  .dialog-media.lb-motion.motion-3 .dialog-media-img{
-    animation-name:lb-pop;
-  }
-  .dialog-media.lb-motion.motion-4 .dialog-media-img{
-    animation-name:lb-sway;
-  }
-  .dialog-media.lb-motion.motion-5 .dialog-media-img{
-    animation-name:lb-soft-zoom;
-  }
-
-  @keyframes lb-spring-left{
-    0%{opacity:.15;transform:translateX(70px) scale(.91) rotate(1.8deg)}
-    58%{opacity:1;transform:translateX(-8px) scale(.995) rotate(-.3deg)}
-    100%{opacity:1;transform:translateX(0) scale(1) rotate(0)}
-  }
-  @keyframes lb-spring-right{
-    0%{opacity:.15;transform:translateX(-70px) scale(.91) rotate(-1.8deg)}
-    58%{opacity:1;transform:translateX(8px) scale(.995) rotate(.3deg)}
-    100%{opacity:1;transform:translateX(0) scale(1) rotate(0)}
-  }
-  @keyframes lb-pop{
-    0%{opacity:.1;transform:scale(.86) rotate(-1deg)}
-    60%{opacity:1;transform:scale(.995) rotate(.25deg)}
-    100%{opacity:1;transform:scale(1) rotate(0)}
-  }
-  @keyframes lb-sway{
-    0%{opacity:.1;transform:translateY(34px) scale(.94) rotate(-1.2deg)}
-    55%{opacity:1;transform:translateY(-5px) scale(1.012) rotate(.25deg)}
-    100%{opacity:1;transform:translateY(0) scale(1) rotate(0)}
-  }
-  @keyframes lb-soft-zoom{
-    0%{opacity:.15;transform:scale(.91)}
-    55%{opacity:1;transform:scale(.995)}
-    100%{opacity:1;transform:scale(1)}
-  }
-
   /* The counter and title join the motion instead of staying completely static. */
   .dialog-top.expressive-update .dialog-title,
   .dialog-top.expressive-update .dialog-count{
@@ -1950,7 +1927,8 @@
   @media (prefers-reduced-motion:reduce){
     .dialog-actions .icon-btn,
     .dialog-actions .filled-btn,
-    .dialog-media.lb-motion .dialog-media-img,
+    .wp-track,
+    .wp-item,
     .dialog-top.expressive-update .dialog-title,
     .dialog-top.expressive-update .dialog-count{
       animation:none !important;
@@ -2208,7 +2186,9 @@
       </div>
       <div class="dialog-media">
         <div class="dialog-status" id="lbStatus">Loading…</div>
-        <img id="lbImg" alt="" />
+        <div class="wp-carousel" id="wpCarousel">
+          <div class="wp-track" id="wpTrack"></div>
+        </div>
       </div>
       <div class="dialog-bottom">
         <div class="dialog-title" id="lbTitle">—</div>
@@ -3365,11 +3345,12 @@ document.getElementById('surpriseBtn').addEventListener('click', ()=>{
 
 /* ---------- Lightbox ---------- */
 const lightbox = document.getElementById('lightbox');
-const lbImg = document.getElementById('lbImg');
 const lbStatus = document.getElementById('lbStatus');
 const lbTitle = document.getElementById('lbTitle');
 const lbCount = document.getElementById('lbCount');
 const lbDownload = document.getElementById('lbDownload');
+const wpCarousel = document.getElementById('wpCarousel');
+const wpTrack = document.getElementById('wpTrack');
 let currentIndex = -1;
 let lightboxPoolMode = 'main';
 
@@ -3396,28 +3377,214 @@ function openLightbox(id, mode = 'main'){
   lightboxPoolMode = mode;
   lightbox.hidden = false;
   document.body.style.overflow = 'hidden';
+  wpPoolIds = null; // force a fresh carousel build for the new pool
   renderLightbox(pool);
 }
-function renderLightbox(pool){
-  const el = pool[currentIndex];
-  const frame = frameData[el.dataset.id];
 
-  lbImg.loading = 'eager';
-  lbImg.decoding = 'async';
-  lbImg.classList.remove('loaded');
+/* ---------- Hero carousel (Material 3 "carousel" style) ----------
+   Every wallpaper in the pool gets one tile in the track. The active tile
+   is uncropped (object-fit:contain) and takes the largest share of the
+   available width so the selected wallpaper stays fully visible; each tile
+   further away shrinks to a proportionally smaller cropped "peek" card. The
+   track is re-centered on the active tile and clamped so it can never show
+   empty space past the first or last wallpaper — which is what produces the
+   "flush against the edge" look at the very start and very end of the
+   list, mirrored on either side. */
+const WP_GAP = 10;
+let wpPoolIds = null;
+let wpDragging = false;
+let wpDragMoved = false;
+let wpDragStartX = 0;
+let wpDragBase = 0;
+// On phones/touch devices, navigation should only happen via the explicit
+// Previous/Next buttons — no swiping the strip and no tapping the image to
+// jump to another wallpaper. Desktop pointer (mouse) drag-to-browse is kept.
+const wpIsTouchNav = window.matchMedia('(pointer:coarse)').matches;
+
+// Each tile's width is a percentage of the carousel's own width, chosen by
+// where the active tile sits in the pool — not just a flat distance taper:
+//  - Active tile at the very start of the pool: 60% / 30% / 10% reading
+//    left-to-right (active, then its next two neighbors), since there's no
+//    earlier wallpaper to show on the left.
+//  - Active tile at the very end of the pool: the mirror image of that,
+//    10% / 30% / 60% reading left-to-right (its previous two neighbors,
+//    then active last).
+//  - Active tile anywhere in between: 30% / 60% / 10% — the immediate
+//    previous wallpaper, the active one, then a small hint of the next one.
+//  - Pools of exactly two wallpapers (e.g. a freshly-uploaded pair) only
+//    ever show two tiles, so it's just 70% active / 30% the other one.
+// This is the *entire* visible set — nothing beyond those named tiles gets
+// any width, so the carousel always reads as exactly 3 cards (or 2, for a
+// 2-wallpaper pool), consistently, the whole way from the first wallpaper
+// to the last.
+function wpItemFraction(i, activeIndex, poolLen){
+  if(poolLen <= 1) return 1;
+  if(poolLen === 2) return i === activeIndex ? 0.70 : 0.30;
+
+  const isFirst = activeIndex === 0;
+  const isLast = activeIndex === poolLen - 1;
+
+  if(isFirst){
+    if(i === 0) return 0.60;
+    if(i === 1) return 0.30;
+    if(i === 2) return 0.10;
+    return null;
+  }
+  if(isLast){
+    if(i === poolLen - 1) return 0.60;
+    if(i === poolLen - 2) return 0.30;
+    if(i === poolLen - 3) return 0.10;
+    return null;
+  }
+  if(i === activeIndex) return 0.60;
+  if(i === activeIndex - 1) return 0.30;
+  if(i === activeIndex + 1) return 0.10;
+  return null;
+}
+
+function wpItemWidth(i, activeIndex, poolLen, containerW){
+  const frac = wpItemFraction(i, activeIndex, poolLen);
+  return frac === null ? 0 : Math.round(containerW * frac);
+}
+
+function goToIndex(i){
+  const pool = getPool(lightboxPoolMode);
+  if(i < 0 || i >= pool.length || i === currentIndex) return;
+  currentIndex = i;
+  renderLightbox(pool);
+}
+
+function buildCarousel(pool){
+  const ids = pool.map(el => el.dataset.id);
+  const sameSet = wpPoolIds && wpPoolIds.length === ids.length && wpPoolIds.every((id,i)=>id===ids[i]);
+  if(sameSet) return Array.from(wpTrack.children);
+
+  wpTrack.innerHTML = '';
+  ids.forEach((id,i) => {
+    const frame = frameData[id];
+    const item = document.createElement('div');
+    item.className = 'wp-item';
+    item.dataset.index = i;
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.draggable = false;
+    img.alt = frame?.title || '';
+    img.src = frame?.previewSrc || makePreviewUrl(frame.src, CARD_PREVIEW_WIDTH);
+    item.appendChild(img);
+    item.addEventListener('click', () => {
+      if(wpIsTouchNav) return; // phones: buttons only, no tap-to-jump
+      if(wpDragMoved) return;
+      goToIndex(i);
+    });
+    wpTrack.appendChild(item);
+  });
+  wpPoolIds = ids;
+  return Array.from(wpTrack.children);
+}
+
+function layoutCarousel(){
+  const items = Array.from(wpTrack.children);
+  if(!items.length || !wpCarousel) return;
+  const containerW = wpCarousel.clientWidth;
+  let x = 0;
+  const lefts = [];
+  items.forEach((item,i) => {
+    const w = wpItemWidth(i, currentIndex, items.length, containerW);
+    const hidden = w === 0;
+    item.style.width = w + 'px';
+    item.classList.toggle('is-active', i === currentIndex);
+    item.classList.toggle('is-hidden', hidden);
+    lefts.push({left:x, width:w});
+    x += w + (hidden ? 0 : WP_GAP);
+  });
+  const trackWidth = x - WP_GAP;
+  const active = lefts[currentIndex];
+  if(!active) return;
+  const activeCenter = active.left + active.width / 2;
+  const minTranslate = Math.min(0, containerW - trackWidth);
+  let translate = containerW / 2 - activeCenter;
+  translate = Math.max(minTranslate, Math.min(0, translate));
+  wpDragBase = translate;
+  if(!wpTrack.classList.contains('is-dragging')){
+    wpTrack.style.transform = `translateX(${translate}px)`;
+  }
+}
+
+function setActiveImage(item, frame){
+  const img = item.querySelector('img');
+  const hi = frame.lightboxSrc || makePreviewUrl(frame.src, LIGHTBOX_PREVIEW_WIDTH);
   lbStatus.hidden = false;
   lbStatus.classList.remove('error');
   lbStatus.textContent = 'Loading…';
-  lbImg.onload = ()=>{ lbImg.classList.add('loaded'); lbStatus.hidden = true; };
-  lbImg.onerror = ()=>{
+  img.onload = () => {
+    lbStatus.hidden = true;
+  };
+  img.onerror = () => {
     lbStatus.classList.add('error');
     lbStatus.textContent = "Couldn't load this image — try Download instead, or open it directly on GitHub.";
   };
-  // The lightbox gets a larger optimized preview, not the original.
-  // This keeps large 4K/8K wallpapers fast to open while preserving the
-  // original URL for the Download button.
-  lbImg.src = frame.lightboxSrc || makePreviewUrl(frame.src, LIGHTBOX_PREVIEW_WIDTH);
-  lbImg.alt = frame.title;
+  if(img.src !== hi){
+    img.src = hi;
+  } else if(img.complete){
+    lbStatus.hidden = true;
+  }
+}
+
+if(wpCarousel){
+  wpCarousel.addEventListener('pointerdown', e => {
+    if(wpIsTouchNav) return; // phones: buttons only, no swipe-drag
+    if(e.pointerType === 'mouse' && e.button !== 0) return;
+    wpDragging = true;
+    wpDragMoved = false;
+    wpDragStartX = e.clientX;
+    wpTrack.classList.add('is-dragging');
+    wpCarousel.classList.add('is-dragging');
+    wpCarousel.setPointerCapture(e.pointerId);
+  });
+  wpCarousel.addEventListener('pointermove', e => {
+    if(!wpDragging) return;
+    const dx = e.clientX - wpDragStartX;
+    if(Math.abs(dx) > 4) wpDragMoved = true;
+    let next = wpDragBase + dx;
+    // Rubber-band resistance once dragging past either end of the strip —
+    // the bounce-back on release is what sells the Pixel-carousel feel.
+    const items = Array.from(wpTrack.children);
+    const containerW = wpCarousel.clientWidth;
+    let x = 0;
+    items.forEach((item,i) => {
+      const w = wpItemWidth(i, currentIndex, items.length, containerW);
+      x += w + (w === 0 ? 0 : WP_GAP);
+    });
+    const trackWidth = x - WP_GAP;
+    const minT = Math.min(0, containerW - trackWidth);
+    const maxT = 0;
+    if(next > maxT) next = maxT + (next - maxT) * 0.35;
+    if(next < minT) next = minT + (next - minT) * 0.35;
+    wpTrack.style.transform = `translateX(${next}px)`;
+  });
+  const endDrag = e => {
+    if(!wpDragging) return;
+    wpDragging = false;
+    wpTrack.classList.remove('is-dragging');
+    wpCarousel.classList.remove('is-dragging');
+    const dx = (e.clientX ?? wpDragStartX) - wpDragStartX;
+    if(Math.abs(dx) > 60){
+      goToIndex(currentIndex + (dx < 0 ? 1 : -1));
+    } else {
+      layoutCarousel(); // spring back to the current tile
+    }
+    setTimeout(() => { wpDragMoved = false; }, 30);
+  };
+  wpCarousel.addEventListener('pointerup', endDrag);
+  wpCarousel.addEventListener('pointercancel', endDrag);
+  window.addEventListener('resize', () => { if(!lightbox.hidden) layoutCarousel(); });
+}
+
+function renderLightbox(pool){
+  const items = buildCarousel(pool);
+  const el = pool[currentIndex];
+  const frame = frameData[el.dataset.id];
 
   lbTitle.textContent = frame.title;
 
@@ -3433,16 +3600,19 @@ function renderLightbox(pool){
     ambient.style.backgroundImage = `url("${ambientSrc}")`;
   }
 
-  // Preload the next image so carousel navigation feels instant.
-  const nextEl = pool[(currentIndex + 1) % pool.length];
-  if(nextEl){
-    const nextFrame = frameData[nextEl.dataset.id];
+  setActiveImage(items[currentIndex], frame);
+  layoutCarousel();
+
+  // Preload neighbors' full-size previews so stepping the carousel feels instant.
+  [currentIndex - 1, currentIndex + 1].forEach(i => {
+    if(i < 0 || i >= pool.length) return;
+    const nextFrame = frameData[pool[i].dataset.id];
     if(nextFrame){
       const preload = new Image();
       preload.decoding = 'async';
       preload.src = nextFrame.lightboxSrc || makePreviewUrl(nextFrame.src, LIGHTBOX_PREVIEW_WIDTH);
     }
-  }
+  });
 
   lbDownload.onclick = ()=> downloadFrame(frame);
 }
@@ -3453,7 +3623,11 @@ function closeLightbox(){
 function stepLightbox(delta){
   const pool = getPool(lightboxPoolMode);
   if(!pool.length) return;
-  currentIndex = (currentIndex + delta + pool.length) % pool.length;
+  // Clamped, not wrapping: the carousel has a real first/last tile, and the
+  // edge-flush layout only reads correctly if navigation actually stops there.
+  const next = Math.max(0, Math.min(pool.length - 1, currentIndex + delta));
+  if(next === currentIndex) return;
+  currentIndex = next;
   renderLightbox(pool);
 }
 document.getElementById('lbClose').addEventListener('click', closeLightbox);
@@ -3468,24 +3642,69 @@ document.addEventListener('keydown', e=>{
 });
 
 /* ---------- Download ---------- */
+
+const wallpaperBlobCache = new Map();
+
+async function preloadWallpaperDownloads(){
+  if (!Array.isArray(frames)) return;
+
+  frames.slice(0, 12).forEach(async (frame)=>{
+    try{
+      const res = await fetch(frame.src, {cache:'force-cache'});
+      const blob = await res.blob();
+      wallpaperBlobCache.set(frame.src, blob);
+    }catch(e){}
+  });
+}
+
 async function downloadFrame(frame){
   try{
-    let href = frame.src;
-    if(!href.startsWith('data:') && !href.startsWith('blob:')){
-      const res = await fetch(href, { mode:'cors' });
-      const blob = await res.blob();
-      href = URL.createObjectURL(blob);
+    showExpressiveSnackbar(
+      'Preparing download...',
+      'Large wallpapers may take a few seconds. Please wait.'
+    );
+
+    const waitingMessage = setTimeout(() => {
+      showExpressiveSnackbar(
+        'Still working...',
+        'Large wallpaper files can take a little longer. Please wait.'
+      );
+    }, 2500);
+
+    const waitingInterval = setInterval(() => {
+      showExpressiveSnackbar(
+        'Still downloading...',
+        'Please keep this page open until the download starts.'
+      );
+    }, 4000);
+
+    let blob = wallpaperBlobCache.get(frame.src);
+
+    if(!blob){
+      const response = await fetch(frame.src, {
+        cache:'force-cache'
+      });
+      blob = await response.blob();
+      wallpaperBlobCache.set(frame.src, blob);
     }
+    const url = URL.createObjectURL(blob);
+
     const a = document.createElement('a');
-    a.href = href;
-    a.download = frame.filename;
+    a.href = url;
+    a.download = frame.filename || 'wallpaper';
+
     document.body.appendChild(a);
     a.click();
     a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+    clearTimeout(waitingMessage);
+    clearInterval(waitingInterval);
+
     showExpressiveSnackbar('Downloaded!', frame.filename);
   }catch(err){
-    window.open(frame.src, '_blank');
-    showExpressiveSnackbar('Opened original', frame.filename);
+    showExpressiveSnackbar('Download failed', frame.filename);
   }
 }
 
@@ -3685,7 +3904,6 @@ updateHeaderOnScroll();
   const snackbarTitle = document.getElementById('expressiveSnackbarTitle');
   const fab = document.getElementById('surpriseBtn');
   const dialogMedia = document.querySelector('.dialog-media');
-  const lbImgEl = document.getElementById('lbImg');
   const lightboxEl = document.getElementById('lightbox');
 
   /* 1. Tiny personality rotation. */
@@ -3739,48 +3957,9 @@ updateHeaderOnScroll();
     snackbarTimer = setTimeout(() => snackbar.classList.remove('is-visible'), 2800);
   };
 
-  /* 4. Swipe navigation in the lightbox. */
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let touchStartTime = 0;
-
-  if(dialogMedia){
-    const markSwipeReady = () => {
-      dialogMedia.classList.remove('swipe-ready');
-      void dialogMedia.offsetWidth;
-      dialogMedia.classList.add('swipe-ready');
-      setTimeout(() => dialogMedia.classList.remove('swipe-ready'), 2400);
-    };
-
-    dialogMedia.addEventListener('touchstart', (event) => {
-      if(event.touches.length !== 1) return;
-      const t = event.touches[0];
-      touchStartX = t.clientX;
-      touchStartY = t.clientY;
-      touchStartTime = performance.now();
-    }, {passive:true});
-
-    dialogMedia.addEventListener('touchend', (event) => {
-      if(!touchStartTime || event.changedTouches.length !== 1) return;
-      const t = event.changedTouches[0];
-      const dx = t.clientX - touchStartX;
-      const dy = t.clientY - touchStartY;
-      const dt = performance.now() - touchStartTime;
-      touchStartTime = 0;
-
-      if(Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.25 || dt > 700) return;
-
-      if(dx < 0) stepLightbox(1);
-      else stepLightbox(-1);
-    }, {passive:true});
-
-    if(window.matchMedia('(pointer:coarse)').matches){
-      const observer = new MutationObserver(() => {
-        if(!lightboxEl.hidden) markSwipeReady();
-      });
-      observer.observe(lightboxEl, {attributes:true, attributeFilter:['hidden']});
-    }
-  }
+  /* 4. Swipe-to-browse has been intentionally disabled on touch devices (see
+     the wp-carousel pointer handlers below) so the Previous/Next buttons are
+     the only way to navigate — the hint label is disabled to match. */
 
   /* 5. Make keyboard navigation feel app-like and avoid accidental page scroll. */
   document.addEventListener('keydown', (event) => {
@@ -3836,7 +4015,6 @@ updateHeaderOnScroll();
 
   let motionTimer = 0;
 
-  const randomMotion = () => Math.floor(Math.random() * 5) + 1;
   const officialShapes = [
   'url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20330%20320%22%3E%3Cpath%20d%3D%22M330%20160C330%20248.366%20258.366%20320%20170%20320C81.6344%20320%209.99999%20248.366%2010%20160C10%2071.6344%2081.6345%20-7.72516e-06%20170%200C258.366%207.72516e-06%20330%2071.6345%20330%20160Z%22%20fill%3D%22white%22%2F%3E%3C%2Fsvg%3E")',
   'url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%2210%201008%20320%20200%22%3E%3Cpath%20d%3D%22M330%201174.92C330%201193.19%20315.19%201208%20296.921%201208H43.0794C24.8102%201208%2010%201193.19%2010%201174.92V1168C9.99999%201079.63%2081.6344%201008%20170%201008C258.366%201008%20330%201079.63%20330%201168V1174.92Z%22%20fill%3D%22white%22%2F%3E%3C%2Fsvg%3E")',
@@ -4082,12 +4260,6 @@ const applyOfficialShape = (button, morph=false) => {
 
 const animateNavigation = (button, direction) => {
 
-    const motion = randomMotion();
-
-    media.classList.remove('lb-motion','motion-1','motion-2','motion-3','motion-4','motion-5');
-    void media.offsetWidth;
-    media.classList.add('lb-motion', `motion-${motion}`);
-
     if(dialogTop){
       dialogTop.classList.remove('expressive-update');
       void dialogTop.offsetWidth;
@@ -4104,7 +4276,6 @@ const animateNavigation = (button, direction) => {
 
     clearTimeout(motionTimer);
     motionTimer = setTimeout(() => {
-      media.classList.remove('lb-motion','motion-1','motion-2','motion-3','motion-4','motion-5');
       dialogTop?.classList.remove('expressive-update');
       button.classList.remove('expressive-press');
     }, 520);
