@@ -1603,7 +1603,14 @@
     pointer-events:none;
     z-index:0;
     transform-origin:center;
-    transition:transform .34s cubic-bezier(.3,.7,.4,1);
+    /* Fallback for browsers without linear()/spring easing support. */
+    transition:transform .34s cubic-bezier(.2,0,0,1);
+    /* Real damped-spring release curve (dampingRatio ~.68), the same shape
+       Android's Compose spring() produces: one small, soft overshoot that
+       decays smoothly back to rest, with continuous velocity throughout
+       (no sudden direction changes). Falls back to the rule above on
+       browsers that don't understand linear(). */
+    transition:transform .444s linear(0, 0.0075, 0.0283, 0.0599, 0.1003, 0.1474, 0.1996, 0.2551, 0.3128, 0.3714, 0.4300, 0.4876, 0.5436, 0.5975, 0.6487, 0.6970, 0.7421, 0.7838, 0.8221, 0.8570, 0.8885, 0.9166, 0.9416, 0.9634, 0.9824, 0.9986, 1.0123, 1.0236, 1.0328, 1.0401, 1.0457, 1.0497, 1.0523, 1.0538, 1.0543, 1.0539, 1.0528, 1.0510, 1.0488, 1.0463, 1.0435, 1.0404, 1.0373, 1.0341, 1.0310, 1.0278, 1.0248, 1.0219, 1.0191, 1.0165, 1.0140, 1.0117, 1.0097, 1.0078, 1.0061, 1.0045, 1.0032, 1.0020, 1.0010, 1.0001, 0.9993, 0.9987, 0.9982, 0.9978, 0.9975, 0.9973, 0.9972, 0.9971, 0.9971, 0.9971, 0.9971, 0.9972, 0.9973, 0.9975, 0.9976, 1);
     will-change:transform;
   }
   .dialog-actions .icon-btn.official-shape .morph-shape-path{
@@ -2084,7 +2091,10 @@
 }
 .dialog-actions .icon-btn.official-shape.pressing .morph-shape-svg{
   transform:scale(.90);
-  transition:transform .1s cubic-bezier(.3,0,.7,.15);
+  /* Quick compress that still decelerates into the pressed state, so the
+     down-stroke doesn't snap — it just arrives softly, same as the
+     release curve above but shorter and with no overshoot. */
+  transition:transform .12s cubic-bezier(.3,0,.4,1);
 }
 </style>
 </head>
@@ -3684,7 +3694,22 @@ updateHeaderOnScroll();
     'goated walls only',
     'your wallpaper is waiting',
     'certified wallpaper moment',
-    'another one 🐱'
+    'another one 🐱',
+    'no cap, this one slaps',
+    'scroll at your own risk',
+    'built different backgrounds',
+    'main character energy',
+    'she\'s a 10 but it\'s a wallpaper',
+    'aesthetic unlocked',
+    'refresh your vibe',
+    'pixel perfect, allegedly',
+    'wallpaper hoarder starter pack',
+    'still better than your ex',
+    'downloading dopamine',
+    'not your average lock screen',
+    'blessed with good taste',
+    'maomao approves 😾',
+    'one more won\'t hurt'
   ];
   let personalityIndex = 0;
   if(subtitle){
