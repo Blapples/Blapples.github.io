@@ -1234,8 +1234,6 @@
     </div>
   </nav>
 
-  <main class="grid" id="grid"></main>
-
   <section class="new-section" id="newSection" hidden>
     <div class="new-section-head">
       <h2 class="new-section-title">
@@ -1246,6 +1244,10 @@
     </div>
     <div class="new-grid" id="newGrid"></div>
   </section>
+
+  <main class="grid" id="grid"></main>
+
+
 
   <footer class="site-footer">
     <p class="footer-message">More goated walls to come</p>🐱
@@ -2353,19 +2355,15 @@ async function init(){
     const known = cachedFrames || [];
     const freshByFile = new Map(freshFrames.map(frame => [frame.filename, frame]));
 
+    // A successful GitHub listing is authoritative.
+    // If wallpapers were deleted from the repository, they should disappear
+    // from the gallery instead of being restored from the local cache.
+    // The cache is still used above for instant startup and remains a fallback
+    // only when the GitHub refresh itself fails.
     let finalFrames = freshFrames;
-    if(known.length && freshFrames.length < known.length){
-      const missingKnown = known.filter(frame => !freshByFile.has(frame.filename));
-      if(missingKnown.length){
-        console.warn(`GitHub returned ${freshFrames.length} wallpapers; preserving ${missingKnown.length} cached wallpaper(s) until the manifest is complete.`);
-        finalFrames = [...freshFrames, ...missingKnown]
-          .sort((a,b) => a.filename.localeCompare(b.filename))
-          .map((frame, index) => ({...frame, frameNo:index + 1}));
-      }
-    }
 
-    // Re-number after merging so frame IDs are always unique and stable for
-    // the current render.
+    // Re-number after the authoritative refresh so frame IDs are always
+    // unique and stable for the current render.
     finalFrames = finalFrames.map((frame, index) => ({...frame, frameNo:index + 1}));
     writeWallpaperCache(finalFrames);
     // Authoritative: this is the live GitHub listing, so it's the one
