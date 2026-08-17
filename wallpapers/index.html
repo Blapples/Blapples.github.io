@@ -37,6 +37,14 @@
     --md-on-surface-variant:#aeb69a;
     --md-outline:rgba(190,205,151,.24);
 
+    /* Dynamic color-filter atmosphere. These stay on the current sage theme
+       until a specific color filter is selected. */
+    --theme-glow-1:rgba(150,170,105,.14);
+    --theme-glow-2:rgba(115,140,76,.12);
+    --theme-bg-1:#0b0d0a;
+    --theme-bg-2:#151912;
+    --theme-bg-3:#090b08;
+
     --shape-xs:10px;
     --shape-sm:18px;
     --shape-md:24px;
@@ -65,10 +73,11 @@
     font-optical-sizing:auto;
     -webkit-font-smoothing:antialiased;
     background:
-      radial-gradient(circle at 18% 15%,rgba(150,170,105,.14),transparent 30%),
-      radial-gradient(circle at 85% 30%,rgba(115,140,76,.12),transparent 32%),
-      linear-gradient(145deg,#0b0d0a,#151912 48%,#090b08);
+      radial-gradient(circle at 18% 15%,var(--theme-glow-1),transparent 30%),
+      radial-gradient(circle at 85% 30%,var(--theme-glow-2),transparent 32%),
+      linear-gradient(145deg,var(--theme-bg-1),var(--theme-bg-2) 48%,var(--theme-bg-3));
     overflow-x:hidden;
+    transition:background .65s ease,color .35s ease;
   }
 
   /* Ambient wallpaper behind the whole interface */
@@ -144,6 +153,68 @@
   .topbar.is-compact h1{font-size:20px}
   .topbar.is-compact .subtitle,.topbar.is-compact .eyebrow-chip{display:none}
 
+  /* Compact desktop header: keep every filter visible without a horizontal scroller. */
+  .topbar.is-compact{
+    gap:12px;
+  }
+  .topbar.is-compact .brand{
+    flex:0 0 auto;
+    gap:10px;
+  }
+  .topbar.is-compact .brand-copy{
+    width:190px;
+  }
+  .topbar.is-compact .color-filter{
+    flex:1 1 0;
+    width:auto;
+    min-width:0;
+    margin:0;
+  }
+  .topbar.is-compact .color-filter-track{
+    width:100%;
+    min-width:0;
+    padding:0;
+    gap:6px;
+    overflow:visible;
+    justify-content:space-between;
+  }
+  .topbar.is-compact .color-chip{
+    flex:0 1 auto;
+    min-width:0;
+    padding:7px 9px 7px 7px;
+    gap:6px;
+    font-size:12px;
+    box-shadow:none;
+  }
+  .topbar.is-compact .color-chip-swatch{
+    width:22px;
+    height:22px;
+    flex:0 0 22px;
+  }
+
+  @media (min-width:641px) and (max-width:900px){
+    .topbar.is-compact{
+      width:calc(100% - 24px);
+      padding:8px 10px;
+      gap:8px;
+    }
+    .topbar.is-compact .brand-copy{width:145px;}
+    .topbar.is-compact h1{font-size:17px;}
+    .topbar.is-compact .brand-mark{width:34px;height:34px;}
+    .topbar.is-compact .brand-mark svg{width:17px;height:17px;}
+    .topbar.is-compact .color-filter-track{gap:3px;}
+    .topbar.is-compact .color-chip{
+      padding:6px 6px 6px 5px;
+      gap:4px;
+      font-size:10px;
+    }
+    .topbar.is-compact .color-chip-swatch{
+      width:18px;
+      height:18px;
+      flex-basis:18px;
+    }
+  }
+
   .brand{
     display:flex;
     align-items:center;
@@ -200,6 +271,119 @@
     white-space:nowrap;
   }
   .eyebrow-chip svg{width:14px;height:14px}
+
+  /* Color filter — Material Expressive filter-chip row for narrowing the
+     gallery to wallpapers that share a dominant color. Colors are sampled
+     client-side (see computeFrameColor) and bucketed into a fixed palette,
+     so chips fade in one at a time as each wallpaper finishes classifying. */
+  .color-filter{
+    width:min(1440px,calc(100% - 36px));
+    margin:0 auto 22px;
+  }
+
+  .color-filter-track{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:2px 4px 10px;
+    overflow-x:auto;
+    scrollbar-width:none;
+    -ms-overflow-style:none;
+  }
+  .color-filter-track::-webkit-scrollbar{display:none}
+
+  .color-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    flex:0 0 auto;
+    padding:10px 16px 10px 10px;
+    border-radius:var(--shape-full);
+    background:var(--md-surface-container-low);
+    border:1px solid var(--md-outline);
+    color:var(--md-on-surface-variant);
+    font-size:13px;
+    font-weight:650;
+    letter-spacing:.01em;
+    cursor:pointer;
+    white-space:nowrap;
+    box-shadow:var(--elev-1);
+    opacity:0;
+    transform:translateY(6px) scale(.94);
+    transition:
+      background .25s var(--standard),
+      color .2s ease,
+      border-color .25s var(--standard),
+      box-shadow .25s var(--standard),
+      transform .35s var(--spring),
+      border-radius .35s var(--spring),
+      opacity .3s ease;
+  }
+  .color-chip.chip-in{opacity:1;transform:none}
+
+  .color-chip:hover{
+    transform:translateY(-2px);
+    box-shadow:var(--elev-2);
+    border-color:rgba(236,241,211,.28);
+  }
+  .color-chip.chip-in:active{transform:scale(.95)}
+
+  .color-chip-swatch{
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    flex:0 0 auto;
+    border:1px solid rgba(255,255,255,.35);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.15);
+  }
+  .color-chip-swatch--all{
+    background:conic-gradient(from 180deg,#e0483e,#e08a3e,#e0c93e,#6cbf5c,#4c7fe0,#8a5ce0,#e0483e);
+  }
+
+  .color-chip-count{
+    color:var(--md-on-surface-variant);
+    font-weight:700;
+    opacity:.6;
+    font-size:11px;
+    margin-left:-2px;
+  }
+
+  .color-chip.is-active{
+    background:var(--md-primary);
+    color:var(--md-on-primary);
+    border-color:transparent;
+    box-shadow:var(--elev-2);
+  }
+  .color-chip.is-active .color-chip-count{color:var(--md-on-primary);opacity:.65}
+  .color-chip.is-active .color-chip-swatch{
+    border-color:rgba(23,26,18,.4);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.15),0 0 0 3px rgba(23,26,18,.14);
+  }
+
+  /* Shown in the track while colors are still being sampled; reuses the
+     same shimmer keyframes as the wallpaper card skeletons below. */
+  .color-chip-skeleton{
+    flex:0 0 auto;
+    height:38px;
+    border-radius:var(--shape-full);
+    background:linear-gradient(
+      110deg,
+      rgba(17,20,14,.78) 30%,
+      rgba(58,70,38,.55) 50%,
+      rgba(17,20,14,.78) 70%
+    );
+    background-size:200% 100%;
+    animation:shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Cards hidden/shown by the color filter fade and settle instead of
+     popping instantly, echoing the spring used for the initial card reveal. */
+  .grid .card.filter-hidden{
+    opacity:0;
+    transform:scale(.94) translateY(8px);
+    pointer-events:none;
+    transition:opacity .22s var(--standard),transform .22s var(--standard);
+  }
 
   .grid{
     width:min(1440px,calc(100% - 36px));
@@ -295,6 +479,69 @@
     color:var(--md-on-surface);
   }
 
+  /* ---------- Viewport-based image loading ---------- */
+/*
+ * Images are only assigned their real source when they are close to the
+ * viewport. This keeps cards above/below the visible area cheap to render.
+ * A small preload margin makes scrolling feel instant without loading the
+ * entire collection at once.
+ */
+.card img{
+  content-visibility:auto;
+}
+
+.card img[data-lazy-src]{
+  opacity:0;
+  transition:opacity .3s ease;
+}
+
+.card img[data-lazy-loaded="true"]{
+  opacity:1;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .card img[data-lazy-src],
+  .card img[data-lazy-loaded="true"]{
+    transition:none;
+  }
+}
+
+/* ---------- Scroll reveal for wallpaper preview cards ---------- */
+  .card{
+    opacity:0;
+    transform:translate3d(0,38px,0) scale(.97);
+    filter:saturate(.88);
+    transition:
+      opacity .65s var(--standard),
+      transform .7s var(--spring),
+      filter .55s ease;
+    will-change:transform,opacity;
+  }
+
+  .card.is-visible{
+    opacity:1;
+    transform:translate3d(0,0,0) scale(1);
+    filter:saturate(1);
+  }
+
+  .card.is-visible:hover{
+    transform:translate3d(0,-6px,0) scale(1.012);
+  }
+
+  .card:nth-child(2n){ transition-delay:40ms; }
+  .card:nth-child(3n){ transition-delay:80ms; }
+
+  @media (prefers-reduced-motion: reduce){
+    .card,
+    .card.is-visible,
+    .card.is-visible:hover{
+      opacity:1;
+      transform:none;
+      filter:none;
+      transition:none;
+    }
+  }
+
   .card:focus-visible{
     outline:2px solid var(--md-primary);
     outline-offset:3px;
@@ -375,13 +622,16 @@
     max-height:92vh;
     overflow:auto;
     padding:16px;
-    background:rgba(52,58,41,.88);
-    border:1px solid rgba(190,205,151,.15);
+    background:color-mix(in srgb,var(--md-primary-container) 48%,#171a14 52%);
+    border:1px solid color-mix(in srgb,var(--md-primary) 28%,transparent);
     border-radius:var(--shape-lg);
-    box-shadow:var(--elev-3);
-    backdrop-filter:blur(30px) saturate(1.1);
-    -webkit-backdrop-filter:blur(30px) saturate(1.1);
+    box-shadow:
+      0 18px 50px rgba(0,0,0,.34),
+      0 0 45px color-mix(in srgb,var(--md-primary) 12%,transparent);
+    backdrop-filter:blur(30px) saturate(1.15);
+    -webkit-backdrop-filter:blur(30px) saturate(1.15);
     animation:dialog-in .45s var(--spring);
+    transition:background .5s ease,border-color .5s ease,box-shadow .5s ease;
   }
 
   @keyframes dialog-in{
@@ -399,10 +649,12 @@
   .dialog-count{
     padding:9px 13px;
     border-radius:var(--shape-full);
-    background:rgba(157,176,109,.10);
+    background:color-mix(in srgb,var(--md-primary) 12%,transparent);
     color:var(--md-on-surface-variant);
+    border:1px solid color-mix(in srgb,var(--md-primary) 12%,transparent);
     font-size:12px;
     font-weight:650;
+    transition:background .4s ease,border-color .4s ease,color .4s ease;
   }
 
   .dialog-media{
@@ -412,16 +664,26 @@
     place-items:center;
     overflow:hidden;
     border-radius:var(--shape-lg);
-    background:rgba(7,9,6,.88);
+    background:
+      radial-gradient(circle at 50% 40%,
+        color-mix(in srgb,var(--md-primary) 15%,transparent),
+        transparent 62%),
+      color-mix(in srgb,var(--md-primary-container) 18%,#070906 82%);
+    border:1px solid color-mix(in srgb,var(--md-primary) 10%,transparent);
+    transition:background .5s ease,border-color .5s ease;
   }
 
   .dialog-media::before{
     content:"";
     position:absolute;
-    inset:0;
+    inset:-20%;
     background:
-      radial-gradient(circle at 50% 40%,rgba(193,207,150,.12),transparent 60%);
+      radial-gradient(circle at 50% 40%,
+        color-mix(in srgb,var(--md-primary) 14%,transparent),
+        transparent 55%);
+    filter:blur(18px);
     pointer-events:none;
+    transition:background .5s ease;
   }
 
   .dialog-media img{
@@ -568,55 +830,146 @@
     .card{height:320px}
   }
 
+  /* Mobile: compact floating color filters beside Surprise Me */
+  .mobile-color-dock{display:none;}
+
   @media (max-width:640px){
-    .topbar{
+    /* Keep the floating mobile controls clean: no extra black top circle. */
+    .mobile-top-btn{
+      display:none !important;
+    }
+
+    .mobile-color-dock{
+      position:fixed;
+      left:14px;
+      bottom:14px;
+      z-index:51;
+      display:flex;
+      align-items:center;
+      gap:7px;
+      max-width:calc(100vw - 76px);
+      padding:7px 5px;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      box-shadow:none;
+      backdrop-filter:none;
+      -webkit-backdrop-filter:none;
+      opacity:0;
+      transform:translate3d(0,18px,0) scale(.96);
+      filter:blur(3px);
+      pointer-events:none;
+      transition:
+        opacity .5s cubic-bezier(.22,1,.36,1),
+        transform .65s cubic-bezier(.16,1,.3,1),
+        filter .5s ease;
+      will-change:transform,opacity,filter;
+    }
+
+    body.mobile-color-dock-visible .mobile-color-dock{
+      opacity:1;
+      transform:translate3d(0,0,0) scale(1);
+      filter:blur(0);
+      pointer-events:auto;
+    }
+
+    .mobile-color-dots{
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      gap:6px;
+      width:max-content;
+      max-width:none;
+      box-sizing:border-box;
+      /*
+       * No horizontal scrolling and no flex-shrinking. Every filter stays a
+       * true circle; the row is sized to fit beside the Surprise Me button.
+       * Extra padding leaves room for the selected white outline.
+       */
+      padding:9px 10px;
+      margin:-9px -10px;
+      overflow:visible;
+      scrollbar-width:none;
+    }
+
+    .mobile-color-dots::-webkit-scrollbar{display:none;}
+
+    .mobile-color-dot{
+      flex:0 0 28px;
+      width:28px;
+      min-width:28px;
+      max-width:28px;
+      height:28px;
+      padding:0;
+      border-radius:50%;
+      border:2px solid transparent;
+      box-shadow:0 1px 5px rgba(0,0,0,.22);
+      transition:
+        transform .35s cubic-bezier(.16,1,.3,1),
+        border-color .3s ease,
+        box-shadow .35s ease;
+    }
+
+    .mobile-color-dot:nth-child(1){transition-delay:0ms;}
+    .mobile-color-dot:nth-child(2){transition-delay:25ms;}
+    .mobile-color-dot:nth-child(3){transition-delay:45ms;}
+    .mobile-color-dot:nth-child(4){transition-delay:65ms;}
+    .mobile-color-dot:nth-child(5){transition-delay:85ms;}
+    .mobile-color-dot:nth-child(6){transition-delay:105ms;}
+    .mobile-color-dot:nth-child(7){transition-delay:125ms;}
+
+    .mobile-color-dot.is-active{
+      transform:scale(1.13);
+      border-color:#fff;
+      box-shadow:
+        0 0 0 2px rgba(255,255,255,.96),
+        0 0 0 5px color-mix(in srgb,var(--md-primary) 25%,transparent);
       position:relative;
-      top:auto;
-      left:auto;
-      transform:none;
+      z-index:2;
+    }
+
+    .mobile-color-dot[data-color="all"]{
+      background:
+        conic-gradient(
+          from 0deg,
+          #ef4444 0deg 55deg,
+          #f59e0b 55deg 105deg,
+          #facc15 105deg 155deg,
+          #4ade80 155deg 215deg,
+          #38bdf8 215deg 275deg,
+          #6366f1 275deg 325deg,
+          #c084fc 325deg 360deg
+        );
+      border-color:transparent;
+    }
+
+    .mobile-color-dot[data-color="all"].is-active{
+      border-color:#fff;
+    }
+
+    @media (prefers-reduced-motion:reduce){
+      .mobile-color-dock,
+      .mobile-color-dot{
+        transition:none;
+        filter:none;
+        transform:none;
+      }
+    }
+  }
+
+  @media (max-width:640px){
+    .topbar.is-mobile-hidden{transform:translateY(calc(-100% - 24px));opacity:0;pointer-events:none;}
+    .mobile-top-btn{display:none !important;}
+    .mobile-top-btn.visible{opacity:1;transform:none;pointer-events:auto;}
+    .mobile-top-btn svg{width:18px;height:18px;}
+
+    .topbar{
+      top:10px;
       width:calc(100% - 20px);
       margin:10px auto 20px;
       padding:13px;
       border-radius:var(--shape-lg);
-      transition:opacity .28s ease,transform .32s cubic-bezier(.22,1.35,.36,1);
     }
-
-    .topbar.is-mobile-hidden{
-      opacity:0;
-      transform:translateY(-120%);
-      pointer-events:none;
-    }
-
-    .mobile-top-btn{
-      position:fixed;
-      top:12px;
-      left:50%;
-      transform:translate(-50%,-140%);
-      z-index:35;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:8px;
-      padding:10px 16px;
-      border-radius:999px;
-      background:var(--md-primary);
-      color:var(--md-on-primary);
-      font-size:13px;
-      font-weight:750;
-      box-shadow:var(--elev-3);
-      opacity:0;
-      pointer-events:none;
-      transition:transform .32s cubic-bezier(.22,1.35,.36,1),opacity .2s ease;
-    }
-
-    .mobile-top-btn.visible{
-      transform:translate(-50%,0);
-      opacity:1;
-      pointer-events:auto;
-    }
-
-    .mobile-top-btn svg{width:16px;height:16px}
-
 
     .brand-mark{width:44px;height:44px;border-radius:var(--shape-lg)}
     .brand-mark svg{width:21px;height:21px;display:block}
@@ -624,6 +977,10 @@
     .subtitle{max-width:58vw;font-size:12px}
 
     .eyebrow-chip{display:none}
+
+    .color-filter{width:calc(100% - 20px);margin:0 auto 16px}
+    .color-filter-track{gap:6px}
+    .color-chip{padding:9px 14px 9px 9px;font-size:12.5px}
 
     .grid{
       width:calc(100% - 20px);
@@ -699,13 +1056,33 @@
     .scrim{
       backdrop-filter:none;
       -webkit-backdrop-filter:none;
-      background:rgba(20,23,15,.90);
+      background:color-mix(in srgb,var(--md-primary-container) 12%,rgba(10,12,9,.90));
+      transition:background .45s ease;
     }
 
     .dialog{
       backdrop-filter:none;
       -webkit-backdrop-filter:none;
-      background:rgba(52,58,41,.98);
+      background:color-mix(in srgb,var(--md-primary-container) 58%,#171a14 42%);
+      border-color:color-mix(in srgb,var(--md-primary) 34%,transparent);
+      box-shadow:
+        0 18px 50px rgba(0,0,0,.42),
+        0 0 42px color-mix(in srgb,var(--md-primary) 16%,transparent);
+      transition:background .5s ease,border-color .5s ease,box-shadow .5s ease;
+    }
+
+    .dialog-count{
+      background:color-mix(in srgb,var(--md-primary) 14%,transparent);
+      border-color:color-mix(in srgb,var(--md-primary) 18%,transparent);
+    }
+
+    .dialog-media{
+      background:
+        radial-gradient(circle at 50% 40%,
+          color-mix(in srgb,var(--md-primary) 17%,transparent),
+          transparent 62%),
+        color-mix(in srgb,var(--md-primary-container) 20%,#070906 80%);
+      border-color:color-mix(in srgb,var(--md-primary) 14%,transparent);
     }
 
     .dialog-media::before{
@@ -751,10 +1128,22 @@
     </span>
   </header>
   <div class="header-placeholder" id="headerPlaceholder" aria-hidden="true"></div>
-  <button class="mobile-top-btn" id="mobileTopBtn" aria-label="Back to top">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11l6-6 6 6"/><path d="M12 5v14"/></svg>
-    <span>Back to top</span>
-  </button>
+  <button class="mobile-top-btn" id="mobileTopBtn" aria-label="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11l6-6 6 6"/><path d="M12 5v14"/></svg><span>Back to top</span></button>
+  <div class="mobile-color-dock" id="mobileColorDock" aria-label="Quick color filters">
+    <div class="mobile-color-dots" id="mobileColorDots"></div>
+  </div>
+
+
+  <nav class="color-filter" id="colorFilter" aria-label="Filter wallpapers by color">
+    <div class="color-filter-track" id="colorFilterTrack">
+      <button type="button" class="color-chip chip-in is-active" id="colorFilterAll" data-color="all" aria-pressed="true">
+        <span class="color-chip-swatch color-chip-swatch--all" aria-hidden="true"></span>
+        All colors
+        <span class="color-chip-count" id="colorFilterAllCount"></span>
+      </button>
+    </div>
+  </nav>
+
   <main class="grid" id="grid"></main>
 
 
@@ -866,6 +1255,165 @@ function normalizeFrame(frame){
   return frame;
 }
 
+/* ---------- Color sampling (Matugen-inspired) ----------
+ * Matugen does not simply average all pixels. It downsizes the wallpaper,
+ * quantizes it into a palette, removes very low-chroma colors, then scores
+ * the remaining candidates by visual importance/population. We mirror that
+ * idea here in browser-safe JS, then map the winning source color into one
+ * of our six filter families.
+ */
+const COLOR_SAMPLE_WIDTH = 112;
+
+function rgbToHsl(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
+  let h=0, sat=0;
+  const l=(max+min)/2, d=max-min;
+  if(d!==0){
+    sat=l>0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max){
+      case r: h=((g-b)/d)+(g<b?6:0); break;
+      case g: h=(b-r)/d+2; break;
+      default: h=(r-g)/d+4;
+    }
+    h*=60;
+  }
+  return {h,s:sat,l};
+}
+
+function rgbToHsv(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+  let h=0;
+  if(d){
+    if(max===r) h=((g-b)/d)%6;
+    else if(max===g) h=(b-r)/d+2;
+    else h=(r-g)/d+4;
+    h*=60; if(h<0) h+=360;
+  }
+  return {h,s:max===0?0:d/max,v:max};
+}
+
+// Six broad Material-like hue families. The boundaries deliberately overlap
+// the natural visual regions rather than treating every shade as a new color.
+function hueFamily(h){
+  if(h>=345 || h<15) return 'red';
+  if(h>=15 && h<45) return 'orange';
+  if(h>=45 && h<75) return 'yellow';
+  // Green intentionally owns mint, lime, emerald, sea-green and turquoise-green.
+  if(h>=75 && h<190) return 'green';
+  if(h>=190 && h<255) return 'blue';
+  return 'purple';
+}
+
+const COLOR_CLASS_PALETTE = [
+  {key:'red',    rgb:[224,72,62],   hue:0},
+  {key:'orange', rgb:[224,138,62],  hue:30},
+  {key:'yellow', rgb:[224,201,62],  hue:60},
+  {key:'green',  rgb:[108,191,92],  hue:130},
+  {key:'blue',   rgb:[76,127,224],  hue:220},
+  {key:'purple', rgb:[138,92,224],  hue:285},
+];
+
+function hueDistance(a,b){
+  const d=Math.abs(a-b);
+  return Math.min(d,360-d);
+}
+
+function classifyColor(r,g,b){
+  const hsv=rgbToHsv(r,g,b);
+  return hueFamily(hsv.h);
+}
+
+/*
+ * Matugen-style palette extraction:
+ *  1. resize to 112px
+ *  2. quantize RGB into compact bins
+ *  3. discard near-gray colors (low chroma)
+ *  4. score candidates by population + chroma + a mild saturation bonus
+ *  5. choose the strongest representative color
+ *
+ * This is intentionally NOT a plain average. A small but strongly saturated
+ * blue area can matter, while a huge black/white background cannot incorrectly
+ * force a colorful wallpaper into a neutral bucket.
+ */
+function computeFrameColor(frame){
+  return new Promise(resolve=>{
+    if(!frame?.src) return resolve(null);
+    let settled=false;
+    const finish=value=>{ if(settled) return; settled=true; clearTimeout(timer); resolve(value); };
+    const timer=setTimeout(()=>finish(null),7000);
+    const probe=new Image();
+    probe.crossOrigin='anonymous';
+    probe.onload=()=>{
+      try{
+        const w=COLOR_SAMPLE_WIDTH;
+        const h=Math.max(1,Math.round((probe.naturalHeight/probe.naturalWidth)*w));
+        const canvas=document.createElement('canvas');
+        canvas.width=w; canvas.height=Math.min(h,112);
+        const ctx=canvas.getContext('2d',{willReadFrequently:true});
+        ctx.drawImage(probe,0,0,canvas.width,canvas.height);
+        const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+        const familyScores=new Map();
+        const familyPixels=new Map();
+        let neutral=0;
+        const bins=new Map();
+
+        for(let i=0;i<data.length;i+=4){
+          if(data[i+3]<16) continue;
+          const r=data[i],g=data[i+1],b=data[i+2];
+          const hsv=rgbToHsv(r,g,b);
+          // Quantize first so similar pastel/dark shades reinforce each other.
+          const qr=Math.round(r/16)*16, qg=Math.round(g/16)*16, qb=Math.round(b/16)*16;
+          const k=(qr<<16)|(qg<<8)|qb;
+          const item=bins.get(k);
+          if(item) item.count++;
+          else bins.set(k,{r:qr,g:qg,b:qb,count:1});
+        }
+
+        for(const item of bins.values()){
+          const hsv=rgbToHsv(item.r,item.g,item.b);
+          const population=item.count;
+          if(hsv.s<0.10 || hsv.v<0.08){ neutral+=population; continue; }
+          const family=hueFamily(hsv.h);
+          // Population dominates. Saturation/value gently emphasize actual color
+          // without letting tiny vivid accents beat the wallpaper's main family.
+          const strength=population*(0.80 + 0.20*hsv.s)*(0.78 + 0.22*hsv.v);
+          familyScores.set(family,(familyScores.get(family)||0)+strength);
+          familyPixels.set(family,(familyPixels.get(family)||0)+population);
+        }
+
+        if(!familyScores.size){
+          // Neutral wallpaper: use the average hue only as a deterministic fallback.
+          let sr=0,sg=0,sb=0,n=0;
+          for(let i=0;i<data.length;i+=4){ if(data[i+3]<16) continue; sr+=data[i];sg+=data[i+1];sb+=data[i+2];n++; }
+          if(!n) return finish(null);
+          const r=Math.round(sr/n),g=Math.round(sg/n),b=Math.round(sb/n);
+          return finish({r,g,b,key:'blue'});
+        }
+
+        let key='green',best=-1;
+        for(const [family,score] of familyScores){
+          if(score>best){best=score;key=family;}
+        }
+
+        // Representative color = weighted average of the winning family's
+        // quantized palette colors. This keeps pastel/dark shades in the same family.
+        let rr=0,gg=0,bb=0,ww=0;
+        for(const item of bins.values()){
+          const hsv=rgbToHsv(item.r,item.g,item.b);
+          if(hsv.s<0.10 || hsv.v<0.08 || hueFamily(hsv.h)!==key) continue;
+          const weight=item.count*(0.8+0.2*hsv.s);
+          rr+=item.r*weight; gg+=item.g*weight; bb+=item.b*weight; ww+=weight;
+        }
+        const r=Math.round(rr/ww),g=Math.round(gg/ww),b=Math.round(bb/ww);
+        finish({r,g,b,key});
+      }catch(err){ finish(null); }
+    };
+    probe.onerror=()=>finish(null);
+    probe.src=makePreviewUrl(frame.src,COLOR_SAMPLE_WIDTH);
+  });
+}
 async function fetchWallpapersFromGitHub(src){
   const apiUrl = `https://api.github.com/repos/${src.user}/${src.repo}/contents/${src.path}?ref=${src.branch}`;
   const res = await fetch(apiUrl, { headers:{ Accept:'application/vnd.github+json' } });
@@ -1005,6 +1553,410 @@ function writeWallpaperCache(frames){
   }
 }
 
+/*
+ * Separate, filename-keyed cache just for sampled colors. Kept independent
+ * of the wallpaper manifest cache above because the GitHub refresh path
+ * often rebuilds fresh frame objects — this way a previously-seen
+ * wallpaper's color survives that rebuild and never needs to be re-sampled.
+ */
+const COLOR_CACHE_KEY = 'blapples-wallpaper-colors-v6-matugen-stable';
+
+function readColorCache(){
+  try{
+    const raw = localStorage.getItem(COLOR_CACHE_KEY);
+    if(!raw) return {};
+    const data = JSON.parse(raw);
+    return (data && typeof data === 'object') ? data : {};
+  }catch(err){
+    console.warn('Color cache could not be read:', err);
+    return {};
+  }
+}
+
+function writeColorCache(map){
+  try{
+    localStorage.setItem(COLOR_CACHE_KEY, JSON.stringify(map));
+  }catch(err){
+    // Storage can be unavailable in private/file contexts; colors just
+    // get re-sampled next visit instead of restoring instantly.
+    console.warn('Color cache could not be written:', err);
+  }
+}
+
+/* ---------- Color filter ---------- */
+const colorFilterTrack = document.getElementById('colorFilterTrack');
+const colorFilterAllBtn = document.getElementById('colorFilterAll');
+const colorFilterAllCount = document.getElementById('colorFilterAllCount');
+
+const COLOR_BUCKETS = [
+  { key:'red',    label:'Red',    swatch:'#e0483e' },
+  { key:'orange', label:'Orange', swatch:'#e08a3e' },
+  { key:'yellow', label:'Yellow', swatch:'#e0c93e' },
+  { key:'green',  label:'Green',  swatch:'#6cbf5c' },
+  { key:'blue',   label:'Blue',   swatch:'#4c7fe0' },
+  { key:'purple', label:'Violet', swatch:'#8a5ce0' },
+];
+
+// A single selected color at a time. Null = "All colors".
+/* ---------- Dynamic color theme ---------- */
+/*
+ * Each filter gets its own accent, button color, focus color, and ambient
+ * background glow. "All colors" restores the original sage/olive palette.
+ */
+const FILTER_THEMES = {
+  red: {
+    primary:'#e0483e', onPrimary:'#fff5f3', primaryContainer:'#6b2924',
+    onPrimaryContainer:'#ffe0dc', secondary:'#c56b62',
+    secondaryContainer:'#42201d', outline:'rgba(224,72,62,.28)',
+    glow1:'rgba(224,72,62,.17)', glow2:'rgba(166,52,45,.12)',
+    bg1:'#100b0a', bg2:'#1b1110', bg3:'#0c0908'
+  },
+  orange: {
+    primary:'#e08a3e', onPrimary:'#1c1209', primaryContainer:'#70431f',
+    onPrimaryContainer:'#ffe2c5', secondary:'#c87531',
+    secondaryContainer:'#452814', outline:'rgba(224,138,62,.28)',
+    glow1:'rgba(224,138,62,.17)', glow2:'rgba(180,91,36,.12)',
+    bg1:'#110d09', bg2:'#1c1510', bg3:'#0c0907'
+  },
+  yellow: {
+    primary:'#e0c93e', onPrimary:'#191609', primaryContainer:'#6b5d1d',
+    onPrimaryContainer:'#fff0a8', secondary:'#c7ad35',
+    secondaryContainer:'#403912', outline:'rgba(224,201,62,.28)',
+    glow1:'rgba(224,201,62,.17)', glow2:'rgba(170,148,38,.12)',
+    bg1:'#110f09', bg2:'#1c1910', bg3:'#0c0b07'
+  },
+  green: {
+    primary:'#6cbf5c', onPrimary:'#0c170b', primaryContainer:'#315c2a',
+    onPrimaryContainer:'#d7f2ce', secondary:'#5aa54d',
+    secondaryContainer:'#203a1c', outline:'rgba(108,191,92,.28)',
+    glow1:'rgba(108,191,92,.17)', glow2:'rgba(71,145,61,.12)',
+    bg1:'#0a100a', bg2:'#111b11', bg3:'#080c08'
+  },
+  blue: {
+    primary:'#4c7fe0', onPrimary:'#f5f8ff', primaryContainer:'#294779',
+    onPrimaryContainer:'#dbe7ff', secondary:'#5f91e5',
+    secondaryContainer:'#1d3153', outline:'rgba(76,127,224,.28)',
+    glow1:'rgba(76,127,224,.17)', glow2:'rgba(54,91,166,.12)',
+    bg1:'#090d13', bg2:'#101722', bg3:'#080b10'
+  },
+  purple: {
+    primary:'#8a5ce0', onPrimary:'#fbf7ff', primaryContainer:'#4b3279',
+    onPrimaryContainer:'#eadcff', secondary:'#9b70df',
+    secondaryContainer:'#30204d', outline:'rgba(138,92,224,.28)',
+    glow1:'rgba(138,92,224,.17)', glow2:'rgba(100,65,169,.12)',
+    bg1:'#0d0a12', bg2:'#17111e', bg3:'#09070c'
+  }
+};
+
+const DEFAULT_THEME = {
+  primary:'#c7d39a', onPrimary:'#171a12', primaryContainer:'#4f5b36',
+  onPrimaryContainer:'#e4e9d2', secondary:'#8f9d70',
+  secondaryContainer:'#303722', outline:'rgba(190,205,151,.24)',
+  glow1:'rgba(150,170,105,.14)', glow2:'rgba(115,140,76,.12)',
+  bg1:'#0b0d0a', bg2:'#151912', bg3:'#090b08'
+};
+
+function applyColorTheme(key){
+  const theme = key ? (FILTER_THEMES[key] || DEFAULT_THEME) : DEFAULT_THEME;
+  const root = document.documentElement;
+
+  root.style.setProperty('--md-primary', theme.primary);
+  root.style.setProperty('--md-on-primary', theme.onPrimary);
+  root.style.setProperty('--md-primary-container', theme.primaryContainer);
+  root.style.setProperty('--md-on-primary-container', theme.onPrimaryContainer);
+  root.style.setProperty('--md-secondary', theme.secondary);
+  root.style.setProperty('--md-secondary-container', theme.secondaryContainer);
+  root.style.setProperty('--md-outline', theme.outline);
+
+  root.style.setProperty('--theme-glow-1', theme.glow1);
+  root.style.setProperty('--theme-glow-2', theme.glow2);
+  root.style.setProperty('--theme-bg-1', theme.bg1);
+  root.style.setProperty('--theme-bg-2', theme.bg2);
+  root.style.setProperty('--theme-bg-3', theme.bg3);
+
+  document.body.dataset.colorTheme = key || 'default';
+}
+
+let activeColor = null;
+const colorChipEls = new Map([['all', colorFilterAllBtn]]);
+const colorCounts = new Map();
+
+function updateChipStates(){
+  colorChipEls.forEach((el,key)=>{
+    const active = key==='all' ? activeColor===null : activeColor===key;
+    el.classList.toggle('is-active', active);
+    el.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function setCardFilterVisible(card, visible){
+  if(visible){
+    if(!card.hidden) return;
+    card.hidden = false;
+    card.classList.add('filter-hidden');
+    void card.offsetWidth; // force reflow so the fade-in transition runs
+    requestAnimationFrame(()=> card.classList.remove('filter-hidden'));
+  }else{
+    if(card.hidden) return;
+    card.classList.add('filter-hidden');
+    window.setTimeout(()=>{
+      if(card.classList.contains('filter-hidden')) card.hidden = true;
+    }, 220);
+  }
+}
+
+function cardMatchesColorFilter(card){
+  const frame=frameData[card.dataset.id];
+  return activeColor===null || !!(frame && frame.colorKey && frame.colorKey===activeColor);
+}
+
+function applyColorFilterToCard(card){
+  if(card) setCardFilterVisible(card,cardMatchesColorFilter(card));
+}
+
+/* ---------- Lazy-load card images near the viewport ---------- */
+const CARD_PRELOAD_MARGIN = '700px 0px';
+
+const cardImageLoader = ('IntersectionObserver' in window)
+  ? new IntersectionObserver((entries)=>{
+      entries.forEach(entry=>{
+        if(!entry.isIntersecting) return;
+
+        const img = entry.target;
+        const src = img.dataset.lazySrc;
+        if(src && !img.dataset.lazyLoaded){
+          img.src = src;
+          img.dataset.lazyLoaded = 'true';
+
+          // Let the browser decode before revealing the image.
+          if(img.decode){
+            img.decode().catch(()=>{}).finally(()=>{
+              img.removeAttribute('data-lazy-src');
+            });
+          }else{
+            img.removeAttribute('data-lazy-src');
+          }
+        }
+
+        cardImageLoader.unobserve(img);
+      });
+    }, {
+      root:null,
+      rootMargin:CARD_PRELOAD_MARGIN,
+      threshold:0.01
+    })
+  : null;
+
+function prepareCardImage(img){
+  if(!img) return;
+
+  // Don't interfere with images that are already loaded.
+  if(img.dataset.lazyPrepared === 'true') return;
+  img.dataset.lazyPrepared = 'true';
+
+  const src = img.getAttribute('src');
+  if(!src) return;
+
+  img.dataset.lazySrc = src;
+  img.removeAttribute('src');
+  img.setAttribute('loading','lazy');
+  img.setAttribute('decoding','async');
+
+  if(cardImageLoader){
+    cardImageLoader.observe(img);
+  }else{
+    img.src = img.dataset.lazySrc;
+    img.dataset.lazyLoaded = 'true';
+  }
+}
+
+function prepareCardImages(root=document){
+  root.querySelectorAll?.('.card img').forEach(prepareCardImage);
+}
+
+/* Reveal cards as they enter the viewport. */
+const cardRevealObserver = ('IntersectionObserver' in window)
+  ? new IntersectionObserver((entries)=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){
+          entry.target.classList.add('is-visible');
+          cardRevealObserver.unobserve(entry.target);
+        }
+      });
+    }, {
+      root:null,
+      rootMargin:'0px 0px -8% 0px',
+      threshold:0.08
+    })
+  : null;
+
+function observeCardReveal(card){
+  if(!card) return;
+  if(cardRevealObserver){
+    cardRevealObserver.observe(card);
+  }else{
+    card.classList.add('is-visible');
+  }
+}
+
+function observeAllCardReveals(){
+  grid.querySelectorAll('.card').forEach(observeCardReveal);
+}
+
+function applyColorFilter(){
+  grid.querySelectorAll('.card').forEach(applyColorFilterToCard);
+  observeAllCardReveals();
+  prepareCardImages(grid);
+}
+
+/* Automatically pick up cards added by the wallpaper renderer/cache. */
+if('MutationObserver' in window){
+  const cardMutationObserver = new MutationObserver((mutations)=>{
+    mutations.forEach(mutation=>{
+      mutation.addedNodes.forEach(node=>{
+        if(node.nodeType !== 1) return;
+        if(node.classList?.contains('card')){
+          observeCardReveal(node);
+          prepareCardImages(node);
+        }
+        node.querySelectorAll?.('.card').forEach(card=>{
+          observeCardReveal(card);
+          prepareCardImages(card);
+        });
+      });
+    });
+  });
+  cardMutationObserver.observe(grid, {childList:true, subtree:true});
+}
+
+function setActiveColor(key){
+  // Selecting a color replaces the previous selection.
+  // Clicking the currently selected color does nothing; use "All colors" to clear it.
+  activeColor = key==='all' ? null : key;
+  applyColorTheme(activeColor);
+  updateChipStates();
+  applyColorFilter();
+
+  // Keep filter changes consistent and responsive by returning the user to the top.
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+colorFilterAllBtn.addEventListener('click', ()=> setActiveColor('all'));
+
+function ensureColorChip(colorKey){
+  if(colorChipEls.has(colorKey)) return colorChipEls.get(colorKey);
+  const meta = COLOR_BUCKETS.find(b=>b.key===colorKey);
+  if(!meta) return null;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'color-chip';
+  btn.dataset.color = colorKey;
+  btn.setAttribute('aria-pressed','false');
+  btn.innerHTML =
+    `<span class="color-chip-swatch" style="background:${meta.swatch}" aria-hidden="true"></span>${meta.label}<span class="color-chip-count"></span>`;
+  btn.addEventListener('click', ()=> setActiveColor(colorKey));
+  colorChipEls.set(colorKey, btn);
+
+  // Not inserted into the DOM yet. Chips stay off-track (but keep
+  // accumulating counts via registerColorForFrame) while the shimmer
+  // placeholders are showing; revealColorChips() adds the whole
+  // discovered set at once, in a fixed rainbow order.
+  return btn;
+}
+
+function registerColorForFrame(frame){
+  if(!COLOR_CLASS_PALETTE.some(c=>c.key===frame.colorKey)) return;
+  const key=frame.colorKey;
+  colorCounts.set(key,(colorCounts.get(key)||0)+1);
+  const chip=ensureColorChip(key);
+  const countEl=chip?.querySelector('.color-chip-count');
+  if(countEl) countEl.textContent=`· ${colorCounts.get(key)}`;
+  if(frame._card) applyColorFilterToCard(frame._card);
+}
+
+// Shimmer placeholders shown in the track while colors are still being
+// sampled, reusing the same shimmer keyframes as the wallpaper skeletons.
+const COLOR_SKELETON_WIDTHS = [76, 96, 64, 88];
+
+function renderColorChipSkeletons(){
+  COLOR_SKELETON_WIDTHS.forEach(width=>{
+    const sk = document.createElement('span');
+    sk.className = 'color-chip-skeleton';
+    sk.style.width = width + 'px';
+    sk.setAttribute('aria-hidden','true');
+    colorFilterTrack.appendChild(sk);
+  });
+}
+
+function clearColorChipSkeletons(){
+  colorFilterTrack.querySelectorAll('.color-chip-skeleton').forEach(el=>el.remove());
+}
+
+// Swaps the shimmer placeholders for every color that was actually
+// discovered, inserted together in a fixed rainbow order and given a
+// short stagger so the reveal reads as one deliberate motion.
+function revealColorChips(){
+  clearColorChipSkeletons();
+  colorFilterTrack.removeAttribute('aria-busy');
+  let i = 0;
+  COLOR_BUCKETS.forEach(({key})=>{
+    const btn = colorChipEls.get(key);
+    if(!btn) return;
+    colorFilterTrack.appendChild(btn);
+    const delay = Math.min(i, 6) * 40;
+    i++;
+    window.setTimeout(()=>{
+      requestAnimationFrame(()=> btn.classList.add('chip-in'));
+    }, delay);
+  });
+}
+
+function resetColorFilterUI(total){
+  colorChipEls.forEach((el,key)=>{ if(key!=='all') el.remove(); });
+  colorChipEls.clear();
+  colorChipEls.set('all', colorFilterAllBtn);
+  colorCounts.clear();
+  activeColor = null;
+  applyColorTheme(null);
+  clearColorChipSkeletons();
+  colorFilterAllCount.textContent = total ? `· ${total}` : '';
+  if(total > 0){
+    renderColorChipSkeletons();
+    colorFilterTrack.setAttribute('aria-busy','true');
+  }else{
+    colorFilterTrack.removeAttribute('aria-busy');
+  }
+  updateChipStates();
+}
+
+async function computeAllFrameColors(frames, generation){
+  const cache=readColorCache();
+  const CONCURRENCY=6;
+  let idx=0, cacheDirty=false;
+  async function worker(){
+    while(idx<frames.length){
+      if(generation!==renderGeneration) return;
+      const frame=frames[idx++];
+      if(!frame) continue;
+      const cached=frame.filename && cache[frame.filename];
+      const valid=cached && COLOR_CLASS_PALETTE.some(c=>c.key===cached.key) &&
+        Number.isFinite(cached.r)&&Number.isFinite(cached.g)&&Number.isFinite(cached.b);
+      let result=valid?cached:await computeFrameColor(frame);
+      if(generation!==renderGeneration) return;
+      if(!result) result={r:128,g:128,b:128,key:'blue'};
+      frame.colorKey=result.key;
+      frame.colorSample=`rgb(${result.r},${result.g},${result.b})`;
+      registerColorForFrame(frame);
+      if(frame.filename && !valid){ cache[frame.filename]=result; cacheDirty=true; }
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(CONCURRENCY,Math.max(1,frames.length))},worker));
+  if(generation!==renderGeneration) return;
+  if(cacheDirty) writeColorCache(cache);
+  revealColorChips();
+  // If cards have already been created, immediately apply any active filter.
+  applyColorFilter();
+}
 let renderGeneration = 0;
 
 function renderFrames(frames, usingPlaceholders=false){
@@ -1016,6 +1968,12 @@ function renderFrames(frames, usingPlaceholders=false){
   grid.innerHTML = '';
   Object.keys(frameData).forEach(key => delete frameData[key]);
   buildCardsChunked(frames, usingPlaceholders, IS_MOBILE_DEVICE ? 6 : 12, generation);
+
+  // Reset the color filter chips for this manifest, then classify every
+  // wallpaper's dominant color in the background (decoupled from lazy card
+  // loading above, so filtering stays accurate even before scrolling).
+  resetColorFilterUI(frames.length);
+  computeAllFrameColors(frames, generation);
 
   if(frames[0]?.src){
     const ambientSrc = frames[0].previewSrc || makePreviewUrl(frames[0].src, CARD_PREVIEW_WIDTH);
@@ -1106,6 +2064,10 @@ function buildCard(frame, idx, usingPlaceholders){
   card.append(img, overlay);
   card.addEventListener('click', ()=> openLightbox(frame.frameNo));
   grid.appendChild(card);
+  frame._card=card;
+  // Chunked rendering can continue after a filter is selected, so every new
+  // card must be filtered immediately instead of waiting for a second click.
+  applyColorFilterToCard(card);
   revealObserver.observe(card);
 }
 
@@ -1178,65 +2140,6 @@ async function init(){
   document.getElementById('subtitle').textContent = 'maomao 😾';
 }
 init();
-
-/* ---------- Responsive header behavior ---------- */
-const topbar = document.querySelector('.topbar');
-const headerPlaceholder = document.getElementById('headerPlaceholder');
-const mobileTopBtn = document.getElementById('mobileTopBtn');
-const mobileLayout = window.matchMedia('(max-width: 640px)');
-let lastScrollY = window.scrollY;
-let headerTicking = false;
-
-function updateHeaderOnScroll(){
-  const y = window.scrollY;
-  const delta = y - lastScrollY;
-  const isMobile = mobileLayout.matches;
-
-  if(isMobile){
-    const hideThreshold = 180;
-    const showThreshold = 80;
-    if(y > hideThreshold && delta > 0){
-      topbar.classList.add('is-mobile-hidden');
-      mobileTopBtn.classList.add('visible');
-    }else if(delta < 0 && y < showThreshold){
-      topbar.classList.remove('is-mobile-hidden');
-      mobileTopBtn.classList.remove('visible');
-    }else if(delta < 0){
-      // Keep the compact top button available while scrolling upward.
-      mobileTopBtn.classList.add('visible');
-    }
-  }else{
-    const compactThreshold = 90;
-    if(y > compactThreshold){
-      if(!topbar.classList.contains('is-compact')){
-        const rect = topbar.getBoundingClientRect();
-        headerPlaceholder.style.height = `${rect.height + 46}px`;
-        headerPlaceholder.style.display = 'block';
-      }
-      topbar.classList.add('is-compact');
-    }else{
-      topbar.classList.remove('is-compact');
-      headerPlaceholder.style.display = 'none';
-      headerPlaceholder.style.height = '0px';
-    }
-  }
-
-  lastScrollY = y;
-  headerTicking = false;
-}
-
-window.addEventListener('scroll', ()=>{
-  if(!headerTicking){
-    headerTicking = true;
-    requestAnimationFrame(updateHeaderOnScroll);
-  }
-},{passive:true});
-
-mobileTopBtn.addEventListener('click', ()=>{
-  window.scrollTo({top:0,behavior:'smooth'});
-  topbar.classList.remove('is-mobile-hidden');
-  mobileTopBtn.classList.remove('visible');
-});
 
 /* ---------- Surprise me ---------- */
 document.getElementById('surpriseBtn').addEventListener('click', ()=>{
@@ -1336,6 +2239,159 @@ async function downloadFrame(frame){
     window.open(frame.src, '_blank');
   }
 }
+
+/* ---------- Responsive header behavior ---------- */
+const topbar = document.querySelector('.topbar');
+const headerPlaceholder = document.getElementById('headerPlaceholder');
+const mobileTopBtn = document.getElementById('mobileTopBtn');
+const colorFilter = document.getElementById('colorFilter');
+const colorFilterHome = colorFilter.parentNode;
+const mobileLayout = window.matchMedia('(max-width: 640px)');
+let lastScrollY = window.scrollY;
+let headerTicking = false;
+
+function moveFilterIntoHeader(){
+  if(colorFilter.parentNode !== topbar) topbar.appendChild(colorFilter);
+}
+function moveFilterBack(){
+  if(colorFilter.parentNode !== colorFilterHome){
+    colorFilterHome.insertBefore(colorFilter, document.getElementById('grid'));
+  }
+}
+
+function updateHeaderOnScroll(){
+  const y = window.scrollY;
+  const delta = y - lastScrollY;
+  const isMobile = mobileLayout.matches;
+
+  if(isMobile){
+    // Exact mobile behavior from blapples-wallpaper-collection-scroll-header(1).
+    moveFilterBack();
+    topbar.classList.remove('is-compact');
+    if(y > 180 && delta > 0){
+      topbar.classList.add('is-mobile-hidden');
+      mobileTopBtn.classList.add('visible');
+    }else if(delta < 0 && y < 80){
+      topbar.classList.remove('is-mobile-hidden');
+      mobileTopBtn.classList.remove('visible');
+    }else if(delta < 0){
+      mobileTopBtn.classList.add('visible');
+    }
+  }else{
+    // Exact desktop compact-header behavior from the reference file.
+    const compactThreshold = 90;
+    if(y > compactThreshold){
+      if(!topbar.classList.contains('is-compact')){
+        const rect = topbar.getBoundingClientRect();
+        headerPlaceholder.style.height = `${rect.height + 46}px`;
+        headerPlaceholder.style.display = 'block';
+      }
+      moveFilterIntoHeader();
+      topbar.classList.add('is-compact');
+    }else{
+      topbar.classList.remove('is-compact');
+      moveFilterBack();
+      headerPlaceholder.style.display = 'none';
+      headerPlaceholder.style.height = '0px';
+    }
+  }
+
+  lastScrollY = y;
+  headerTicking = false;
+}
+
+window.addEventListener('scroll', ()=>{
+  if(!headerTicking){
+    headerTicking = true;
+    requestAnimationFrame(updateHeaderOnScroll);
+  }
+},{passive:true});
+
+window.addEventListener('resize', ()=>{
+  if(mobileLayout.matches) moveFilterBack();
+  else if(window.scrollY > 90) moveFilterIntoHeader();
+},{passive:true});
+
+mobileTopBtn.addEventListener('click', ()=>{
+  window.scrollTo({top:0,behavior:'smooth'});
+  topbar.classList.remove('is-mobile-hidden');
+  mobileTopBtn.classList.remove('visible');
+});
+
+/* Mobile compact color-filter dock */
+const mobileColorDock = document.getElementById('mobileColorDock');
+const mobileColorDots = document.getElementById('mobileColorDots');
+
+function buildMobileColorDots(){
+  if(!mobileColorDots || typeof COLOR_BUCKETS === 'undefined') return;
+
+  mobileColorDots.innerHTML = '';
+
+  const all = document.createElement('button');
+  all.type = 'button';
+  all.className = 'mobile-color-dot';
+  all.dataset.color = 'all';
+  all.title = 'All colors';
+  all.setAttribute('aria-label','All colors');
+  all.addEventListener('click',()=>setActiveColor('all'));
+  mobileColorDots.appendChild(all);
+
+  COLOR_BUCKETS.forEach(meta=>{
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'mobile-color-dot';
+    dot.dataset.color = meta.key;
+    dot.title = meta.label;
+    dot.setAttribute('aria-label',meta.label);
+    dot.style.background = meta.swatch;
+    dot.addEventListener('click',()=>setActiveColor(meta.key));
+    mobileColorDots.appendChild(dot);
+  });
+
+  updateMobileColorDots();
+}
+
+function updateMobileColorDots(){
+  if(!mobileColorDots) return;
+  mobileColorDots.querySelectorAll('.mobile-color-dot').forEach(dot=>{
+    const active = dot.dataset.color === 'all'
+      ? activeColor === null
+      : dot.dataset.color === activeColor;
+    dot.classList.toggle('is-active',active);
+    dot.setAttribute('aria-pressed',String(active));
+  });
+}
+
+const mobileColorOriginalSetActiveColor = setActiveColor;
+setActiveColor = function(key){
+  mobileColorOriginalSetActiveColor(key);
+  updateMobileColorDots();
+};
+
+buildMobileColorDots();
+
+let mobileColorDockTicking = false;
+window.addEventListener('scroll',()=>{
+  if(mobileColorDockTicking) return;
+  mobileColorDockTicking = true;
+
+  requestAnimationFrame(()=>{
+    if(mobileLayout.matches){
+      document.body.classList.toggle('mobile-color-dock-visible',window.scrollY > 180);
+    }else{
+      document.body.classList.remove('mobile-color-dock-visible');
+    }
+    mobileColorDockTicking = false;
+  });
+},{passive:true});
+
+window.addEventListener('resize',()=>{
+  if(!mobileLayout.matches){
+    document.body.classList.remove('mobile-color-dock-visible');
+  }
+},{passive:true});
+
+updateHeaderOnScroll();
 </script>
 </body>
 </html>
