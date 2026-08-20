@@ -70,6 +70,20 @@
   html,body{margin:0;padding:0}
   html{scroll-behavior:smooth}
 
+  /* Kill the browser's own default press feedback everywhere - the blue/
+     grey flash Android shows on tap, and the blue selection-ish highlight
+     iOS shows on a press-and-hold (also suppresses its "Open/Copy/Share"
+     long-press callout bubble). The app already has its own deliberate
+     press/ripple treatment on buttons and cards, so this is purely
+     removing the redundant native one underneath it, everywhere at once. */
+  *{
+    -webkit-tap-highlight-color:transparent;
+    tap-highlight-color:transparent;
+  }
+  button,a,.card,img{
+    -webkit-touch-callout:none;
+  }
+
   body{
     min-height:100vh;
     color:var(--md-on-surface);
@@ -1647,7 +1661,16 @@
       transform:translateY(10px);
       pointer-events:none;
     }
-    .dialog.is-maximized .wp-carousel{touch-action:none}
+    /* Phones, full screen: let the browser's native two-finger pinch-zoom
+       through instead of eating it. This used to be touch-action:none,
+       which blocks every native gesture on the element - panning AND
+       pinch-zoom alike - so there was no way to zoom in on a wallpaper at
+       all in this view. 'pinch-zoom' keeps that same panning block (our
+       own pointer handlers below still own single-finger drag: swipe down
+       to close, tap to toggle the bars) while carving out an exception for
+       the two-finger zoom gesture specifically, so the browser handles
+       that natively without any custom zoom/pan code needed. */
+    .dialog.is-maximized .wp-carousel{touch-action:pinch-zoom}
   }
 
   /* Mobile performance: avoid expensive fixed blur/backdrop-filter layers and
@@ -4603,7 +4626,15 @@ function layoutCarousel(){
   // accurate baseline — no per-tile pop/slide animation is added here
   // anymore; the track's own transform transition is the only motion.
   wpLastPunchedIndex = currentIndex;
-  positionLbSpinner(translate + activeCenter - containerW / 2);
+  // The nudge below only means something for the desktop peek-carousel,
+  // where activeCenter (from the 60/30/10% peek-fraction math above) can
+  // sit off the container's true center. In mobile single-view there are
+  // no peek tiles - the active tile already fills and is centered in the
+  // container on its own - so activeCenter is meaningless here and was
+  // pushing the spinner off-center in the phone/fullscreen popup for no
+  // reason. Always center it there instead of applying the leftover
+  // desktop offset.
+  positionLbSpinner(wpMobileSingleView.matches ? 0 : translate + activeCenter - containerW / 2);
 }
 
 // The loading spinner is centered across the whole .dialog-media box by
