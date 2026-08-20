@@ -276,6 +276,39 @@
   }
   .eyebrow-chip svg{width:14px;height:14px}
 
+  /* Wraps the eyebrow chip and the sound/roast toggle buttons together so
+     the pair keeps sitting on the right side of the header as one unit,
+     the same spot the eyebrow chip occupied on its own before. */
+  .topbar-end{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex:0 0 auto;
+  }
+  .topbar-toggles{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex:0 0 auto;
+  }
+  .topbar-toggles .icon-btn.is-active{
+    background:var(--md-primary);
+    color:var(--md-on-primary);
+    border-color:transparent;
+  }
+  #soundToggleBtn .icon-sound-on{display:none}
+  #soundToggleBtn.is-active .icon-sound-on{display:block}
+  #soundToggleBtn.is-active .icon-sound-off{display:none}
+
+  .topbar.is-compact .topbar-toggles .icon-btn{
+    width:36px;
+    height:36px;
+  }
+  .topbar.is-compact .topbar-toggles .icon-btn svg{
+    width:16px;
+    height:16px;
+  }
+
   /* Color filter — Material Expressive filter-chip row for narrowing the
      gallery to wallpapers that share a dominant color. Colors are sampled
      client-side (see computeFrameColor) and bucketed into a fixed palette,
@@ -418,16 +451,24 @@
     box-shadow:var(--elev-1);
     isolation:isolate;
     opacity:0;
-    transform:translateY(18px) scale(.985);
+    transform:translateY(18px) scale(.97);
+    filter:saturate(.88);
     transition:
-      opacity .55s var(--spring),
-      transform .55s var(--spring),
+      opacity .6s var(--spring),
+      transform .6s var(--spring),
+      filter .5s ease,
       box-shadow .35s var(--standard),
-      border-radius .45s var(--spring);
+      border-radius .4s var(--spring);
     content-visibility:auto;
     contain-intrinsic-size:320px 340px;
   }
-  .card.visible{opacity:1;transform:none}
+  .card.visible{opacity:1;transform:none;filter:saturate(1)}
+
+  /* Staggered pop-in: a handful of cards springing in slightly out of sync
+     reads as far more alive than every card arriving in perfect lockstep. */
+  .card:nth-child(3n+1){transition-delay:0ms}
+  .card:nth-child(3n+2){transition-delay:45ms}
+  .card:nth-child(3n){transition-delay:90ms}
 
   .card::before{
     content:"";
@@ -444,12 +485,37 @@
     );
   }
 
+  /* Expressive shape-morph: corners flex asymmetrically on hover, then flex
+     the opposite way on press, like a squeezed squircle, instead of a flat
+     uniform radius change. */
   .card:hover,.card:focus-visible{
     box-shadow:var(--elev-3);
     transform:translateY(-6px) scale(1.012);
     border-color:rgba(236,241,211,.24);
-    border-radius:var(--shape-lg);
+    border-radius:36px 14px 36px 14px;
     z-index:2;
+    will-change:transform,box-shadow;
+  }
+  .card:active{
+    border-radius:14px 36px 14px 36px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .card{
+      opacity:1;
+      transform:none;
+      filter:none;
+      transition:box-shadow .2s ease;
+    }
+    .card:hover,.card:focus-visible,.card:active{
+      border-radius:var(--shape-lg);
+      transform:none;
+    }
+  }
+
+  .card:focus-visible{
+    outline:2px solid var(--md-primary);
+    outline-offset:3px;
   }
 
   .card img{
@@ -471,9 +537,15 @@
   }
 
   /* Wallpaper names are hidden on the cards to keep the gallery compact.
-     The name is still shown in the lightbox after clicking a wallpaper. */
+     The name is still shown in the lightbox after clicking a wallpaper —
+     except in Roast Me mode, see body.roast-mode above, where a caption
+     is deliberately surfaced here on the card itself. */
   .card-overlay{
     display:none;
+    position:absolute;
+    inset:0;
+    z-index:2;
+    pointer-events:none;
   }
 
   .card-title{
@@ -597,46 +669,9 @@
   }
 }
 
-/* ---------- Scroll reveal for wallpaper preview cards ---------- */
-  .card{
-    opacity:0;
-    transform:translate3d(0,38px,0) scale(.97);
-    filter:saturate(.88);
-    transition:
-      opacity .65s var(--standard),
-      transform .7s var(--spring),
-      filter .55s ease;
-    will-change:transform,opacity;
-  }
-
-  .card.is-visible{
-    opacity:1;
-    transform:translate3d(0,0,0) scale(1);
-    filter:saturate(1);
-  }
-
-  .card.is-visible:hover{
-    transform:translate3d(0,-6px,0) scale(1.012);
-  }
-
-  .card:nth-child(2n){ transition-delay:40ms; }
-  .card:nth-child(3n){ transition-delay:80ms; }
-
-  @media (prefers-reduced-motion: reduce){
-    .card,
-    .card.is-visible,
-    .card.is-visible:hover{
-      opacity:1;
-      transform:none;
-      filter:none;
-      transition:none;
-    }
-  }
-
-  .card:focus-visible{
-    outline:2px solid var(--md-primary);
-    outline-offset:3px;
-  }
+/* ---------- Scroll reveal for wallpaper preview cards ----------
+   (Card entrance timing/shape-morph now lives in the single .card block
+   near the top of the sheet — see the "visible"/hover/active rules there.) */
 
   .skeleton{
     aspect-ratio:16 / 9;
@@ -659,9 +694,9 @@
   }
 
   @keyframes pulse-ring{
-    0%{box-shadow:var(--elev-2),0 0 0 0 rgba(217,223,189,.50)}
-    70%{box-shadow:var(--elev-2),0 0 0 18px rgba(217,223,189,0)}
-    100%{box-shadow:var(--elev-1),0 0 0 0 rgba(217,223,189,0)}
+    0%{box-shadow:var(--elev-2),0 0 0 0 color-mix(in srgb,var(--glow-color,#d9dfbd) 50%,transparent)}
+    70%{box-shadow:var(--elev-2),0 0 0 18px color-mix(in srgb,var(--glow-color,#d9dfbd) 0%,transparent)}
+    100%{box-shadow:var(--elev-1),0 0 0 0 color-mix(in srgb,var(--glow-color,#d9dfbd) 0%,transparent)}
   }
   .card.pulse{animation:pulse-ring 1s var(--standard)}
 
@@ -709,8 +744,8 @@
   @keyframes fade-in{from{opacity:0}to{opacity:1}}
 
   .dialog{
-    width:min(1120px,94vw);
-    max-height:92vh;
+    width:min(1280px,94vw);
+    max-height:94vh;
     overflow:auto;
     padding:16px;
     background:color-mix(in srgb,var(--md-primary-container) 48%,#171a14 52%);
@@ -722,7 +757,8 @@
     backdrop-filter:blur(30px) saturate(1.15);
     -webkit-backdrop-filter:blur(30px) saturate(1.15);
     animation:dialog-in .45s var(--spring);
-    transition:background .5s ease,border-color .5s ease,box-shadow .5s ease;
+    transition:background .5s ease,border-color .5s ease,box-shadow .5s ease,
+               width .4s var(--spring),max-height .4s var(--spring);
   }
 
   @keyframes dialog-in{
@@ -736,6 +772,31 @@
     justify-content:space-between;
     margin-bottom:12px;
   }
+
+  .dialog-top-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  /* ---------- Maximize toggle ----------
+     Default dialog size stays a comfortable centered modal. Toggling
+     maximize expands it to fill nearly the whole viewport and gives the
+     media area a lot more vertical room, closer to a true fullscreen
+     viewer, without a page navigation or losing the carousel strip. */
+  .dialog.is-maximized{
+    width:min(1800px,98vw);
+    max-height:98vh;
+  }
+  .dialog.is-maximized .dialog-media{
+    max-height:min(82vh,1300px);
+  }
+  .scrim:has(.dialog.is-maximized){
+    padding:10px;
+  }
+  #lbMaximize .icon-restore{display:none}
+  #lbMaximize[aria-pressed="true"] .icon-expand{display:none}
+  #lbMaximize[aria-pressed="true"] .icon-restore{display:block}
 
   .dialog-count{
     padding:9px 13px;
@@ -791,9 +852,9 @@
      never leave a gap: at the very first wallpaper the active tile sits
      flush against the left edge (nothing to balance it on that side), and
      at the very last wallpaper it sits flush against the right edge — the
-     mirror image of the start. Width and position both animate on a
-     springy, overshooting curve so switching or dragging feels bouncy
-     rather than a flat cross-fade. */
+     mirror image of the start. Width and position both animate on a plain,
+     smooth glide — a single, calm slide of the whole strip, the same way it
+     already feels while dragging — rather than any bounce or per-tile pop. */
   .wp-carousel{
     position:relative;
     width:100%;
@@ -810,7 +871,7 @@
     align-items:center;
     height:100%;
     will-change:transform;
-    transition:transform .55s cubic-bezier(.22,1.6,.36,1);
+    transition:transform .38s cubic-bezier(.16,1,.3,1);
   }
   .wp-track.is-dragging{transition:none}
   .wp-item{
@@ -821,12 +882,19 @@
     border-radius:20px;
     overflow:hidden;
     cursor:pointer;
+    contain:layout paint style;
     background:color-mix(in srgb,var(--md-primary-container) 30%,#0a0c08 70%);
     box-shadow:0 6px 18px rgba(0,0,0,.28);
-    transition:width .55s cubic-bezier(.22,1.6,.36,1),
-               opacity .4s ease,
-               box-shadow .3s ease;
+    /* width is the one property here that can't be handed to the compositor
+       — animating it forces a real layout pass every frame, on every tile
+       resizing at once (the shrinking old-active, the growing new-active,
+       any cascading pills). box-shadow used to transition too, which meant
+       an expensive blur recalculation on top of that same reflow every
+       frame; it now switches instantly instead, since the two costs
+       stacking together was the main source of visible jank. */
+    transition:width .38s cubic-bezier(.16,1,.3,1);
   }
+  .wp-item.is-active{transition:width .38s cubic-bezier(.16,1,.3,1),box-shadow .3s ease}
   .wp-item img{
     width:100%;
     height:100%;
@@ -864,14 +932,82 @@
     inset:0;
     z-index:2;
     display:flex;
+    flex-direction:column;
     align-items:center;
     justify-content:center;
+    gap:14px;
     font-size:13px;
     color:var(--md-on-surface-variant);
     min-height:220px;
   }
   .dialog-status[hidden]{display:none}
   .dialog-status.error{color:var(--md-primary);padding:0 24px;text-align:center}
+
+  /* Loading spinner: a tinted circle with one of the app's own M3 expressive
+     shapes (see officialShapes in the script) rendered as a real SVG path —
+     the same morph-engine primitive the nav buttons use, so pressing
+     Next/Prev smoothly morphs the spinner's silhouette into a new shape
+     instead of just spinning in place, reading as part of the same design
+     language rather than a generic browser spinner. The .lb-spinner element
+     is also nudged horizontally by JS (see positionLbSpinner in the script)
+     so it stays centered over the active wallpaper rather than the dialog
+     box, since the carousel's active tile isn't always centered in that box
+     (it sits flush left/right at the first/last wallpaper). */
+  .lb-spinner{
+    width:56px;
+    height:56px;
+    border-radius:50%;
+    background:var(--md-primary-container);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    position:relative;
+    transition:transform .25s ease;
+  }
+  .lb-spinner.official-shape .morph-shape-svg{
+    position:absolute;
+    top:22%;
+    left:22%;
+    width:56%;
+    height:56%;
+    display:block;
+    overflow:visible;
+    pointer-events:none;
+    transform-origin:center;
+    animation:lb-spinner-rotate 1.7s linear infinite;
+  }
+  .lb-spinner.official-shape .morph-shape-path{
+    fill:var(--md-primary);
+    transform-box:fill-box;
+    transform-origin:center;
+  }
+  @keyframes lb-spinner-rotate{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){
+    .lb-spinner.official-shape .morph-shape-svg{animation:none !important}
+  }
+
+  /* Text stays for screen readers and for the error state (which needs to
+     actually be read, not just implied by the spinner stopping) — visually
+     hidden the rest of the time, matching the reference: just the spinner,
+     no "Loading…" caption cluttering the photo. */
+  .lb-status-text{
+    position:absolute;
+    width:1px;height:1px;
+    padding:0;margin:-1px;
+    overflow:hidden;
+    clip:rect(0,0,0,0);
+    white-space:nowrap;
+    border:0;
+  }
+  .dialog-status.error .lb-status-text{
+    position:static;
+    width:auto;height:auto;
+    margin:0;
+    clip:auto;
+    white-space:normal;
+  }
+  .dialog-status.error .lb-spinner{display:none}
 
   .dialog-bottom{
     display:grid;
@@ -922,6 +1058,37 @@
   .icon-btn:active{transform:scale(.9)}
   .icon-btn svg{width:19px;height:19px}
 
+  /* ---------- Button press ripple ----------
+     A quick radial burst from the pointer position on press, on every
+     icon/filled/FAB button. Spawned in JS (see spawnRipple) as a plain
+     absolutely-positioned span; the button just needs to clip and host it. */
+  .icon-btn,.filled-btn,.fab{
+    position:relative;
+    overflow:hidden;
+  }
+  /* The shared ripple rule above sets position:relative on everything it
+     touches, including the FAB — but the FAB needs position:fixed to stay
+     pinned to the corner of the viewport. Restate it here so this rule
+     (later in the cascade, same specificity) wins. */
+  .fab{
+    position:fixed;
+    overflow:hidden;
+  }
+  .ripple{
+    position:absolute;
+    border-radius:50%;
+    transform:scale(0);
+    background:color-mix(in srgb,currentColor 45%,transparent);
+    pointer-events:none;
+    animation:ripple-burst .6s ease-out forwards;
+  }
+  @keyframes ripple-burst{
+    to{transform:scale(1);opacity:0}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .ripple{display:none}
+  }
+
   .filled-btn{
     display:inline-flex;
     align-items:center;
@@ -941,6 +1108,112 @@
   }
   .filled-btn:active{transform:scale(.95)}
   .filled-btn svg{width:17px;height:17px}
+
+  /* ---------- Download success flourish ----------
+     Icon morphs to a checkmark and the fill briefly tints toward green with
+     a scale-punch, then everything reverts back to the normal Download
+     state after a beat (handled in downloadFrame). */
+  .filled-btn .icon-check{display:none}
+  .filled-btn.is-success .icon-download{display:none}
+  .filled-btn.is-success .icon-check{display:block}
+  .filled-btn.is-success{
+    background:color-mix(in srgb,var(--md-primary) 55%,#5fd484 45%);
+    animation:download-success-pop .5s cubic-bezier(.22,1.6,.36,1);
+  }
+  @keyframes download-success-pop{
+    0%{transform:scale(1)}
+    40%{transform:scale(1.08)}
+    100%{transform:scale(1)}
+  }
+
+  /* ---------- Confetti burst ----------
+     A small handful of colored pieces launched from the Download button on
+     a successful save. Purely decorative: position/rotation/opacity are
+     driven by the Web Animations API in JS (see fireConfetti), not CSS
+     keyframes, so each burst can randomize its own physics without needing
+     a matching keyframe per particle. This class only sets the static look
+     of a single piece. */
+  .confetti-piece{
+    position:fixed;
+    top:0;
+    left:0;
+    width:8px;
+    height:8px;
+    border-radius:2px;
+    pointer-events:none;
+    z-index:2147483000;
+    will-change:transform,opacity;
+  }
+  .confetti-piece.is-round{border-radius:50%}
+
+  @media (prefers-reduced-motion:reduce){
+    .confetti-piece{display:none}
+  }
+
+  /* ---------- Card hover/long-press preview ----------
+     A single shared floating element, reused for every card instead of
+     one per card, since only one preview is ever open at a time. Shown on
+     desktop after a short hover delay (see wireCardPreview in JS) and on
+     touch after a long-press, so people can peek at the full uncropped
+     image without committing to opening the lightbox. */
+  .card-preview-float{
+    position:fixed;
+    top:0;
+    left:0;
+    z-index:2147483000;
+    max-width:320px;
+    max-height:320px;
+    border-radius:16px;
+    overflow:hidden;
+    box-shadow:0 12px 32px rgba(0,0,0,.35),0 2px 8px rgba(0,0,0,.25);
+    opacity:0;
+    transform:scale(.94);
+    transform-origin:center;
+    transition:opacity .16s var(--standard),transform .16s var(--standard);
+    pointer-events:none;
+    background:var(--md-surface-container-high, #222);
+  }
+  .card-preview-float.is-visible{
+    opacity:1;
+    transform:scale(1);
+  }
+  .card-preview-float img{
+    display:block;
+    width:100%;
+    height:100%;
+    object-fit:contain;
+  }
+  .card-preview-float.is-touch{
+    max-width:min(78vw,420px);
+    max-height:min(60vh,420px);
+  }
+  @media (prefers-reduced-motion:reduce){
+    .card-preview-float{transition:opacity .01s linear}
+  }
+  @media (hover:none){
+    .card-preview-float:not(.is-touch){display:none}
+  }
+
+  /* ---------- Cursor trail ----------
+     A faint paw-print trail that follows the pointer while it moves over
+     the gallery grid — desktop only (see the hover:hover/pointer:fine
+     guard in JS), purely decorative, and capped to a low spawn rate so it
+     never turns into a stream of DOM nodes. */
+  .cursor-trail-piece{
+    position:fixed;
+    top:0;
+    left:0;
+    width:14px;
+    height:14px;
+    z-index:5;
+    pointer-events:none;
+    opacity:0;
+    will-change:transform,opacity;
+    color:var(--md-primary);
+  }
+  @media (hover:none),(prefers-reduced-motion:reduce){
+    .cursor-trail-piece{display:none}
+  }
 
   button:focus-visible{
     outline:2px solid var(--md-primary);
@@ -1145,6 +1418,9 @@
 
     .eyebrow-chip{display:none}
 
+    .topbar-toggles .icon-btn{width:38px;height:38px}
+    .topbar-toggles .icon-btn svg{width:16px;height:16px}
+
     .color-filter{width:calc(100% - 20px);margin:0 auto 16px}
     .color-filter-track{gap:6px}
     .color-chip{padding:9px 14px 9px 9px;font-size:12.5px}
@@ -1178,15 +1454,28 @@
       padding:10px;
       border-radius:var(--shape-lg);
     }
-    .dialog-bottom{
-      grid-template-columns:1fr;
-      align-items:stretch;
+  }
+
+  /* ---------- Mobile lightbox: single wallpaper, no carousel peeks ----------
+     The peek-cascade carousel (see the "Hero carousel" block above) is a
+     desktop-hover-friendly browsing aid — on a phone there's no pointer
+     hovering over neighbor tiles to hint at, and the shrunk peek tiles just
+     eat space that the actual photo could use. So on mobile, the carousel
+     engine still runs underneath (still tracks which frame is active, still
+     swaps in the full-res image, still preloads neighbors) but only its
+     active tile is ever shown, at the full width of the frame — every
+     other tile is hidden outright rather than shrunk to a sliver. See
+     wpMobileSingleView in the script below, which keeps the track's
+     transform in sync with this (the peek-width math it would otherwise use
+     no longer matches what's on screen once this rule hides everything but
+     the active tile). */
+  @media (max-width:760px){
+    .wp-item{display:none}
+    .wp-item.is-active{
+      display:block;
+      width:100% !important;
+      margin:0;
     }
-    .dialog-actions{
-      justify-content:flex-end;
-      width:100%;
-    }
-    .filled-btn{flex:1;justify-content:center}
   }
 
   /* Long wallpaper names: keep the action controls together and right-aligned
@@ -1195,29 +1484,172 @@
      phones regardless of how long a given wallpaper's name is — matching
      the desktop popup, which never resizes between wallpapers. */
   @media (max-width:760px){
+    /* Popup never scrolls on mobile, and the full wallpaper name is always
+       shown (no truncation) — see .dialog and .dialog-title below. Since
+       the title can now wrap to more than one line for long names, the
+       image's max-height is a calc() that reserves room for a realistic
+       worst case (title up to 3 lines, plus both bars, plus padding) rather
+       than a flat guess, so a long name can't push the popup taller than
+       the viewport. */
+    .dialog{
+      overflow:hidden;
+    }
+    /* Single-photo view (see the earlier ".wp-item{display:none}" rule):
+       size the frame around the wallpaper's own proportions instead of a
+       fixed 16:9 box. Most wallpapers here are portrait, so a landscape-
+       shaped frame was letterboxing nearly every one — big black bars down
+       the sides. min-height keeps the "Loading…" state from collapsing to
+       nothing before the image's real size is known.
+       Only the default (non-maximized) view — true-fullscreen maximized
+       mode further down still fills the whole screen and lets
+       object-fit:contain do its normal letterboxing there, which is
+       correct once you're deliberately going edge-to-edge. */
     .dialog-media{
       width:100%;
-      aspect-ratio:16 / 9;
+      aspect-ratio:auto;
       height:auto;
       max-height:none;
-      min-height:0;
+      min-height:160px;
     }
+    .dialog:not(.is-maximized) .wp-carousel,
+    .dialog:not(.is-maximized) .wp-track,
+    .dialog:not(.is-maximized) .wp-item.is-active{
+      height:auto;
+    }
+    .dialog:not(.is-maximized) .wp-item.is-active img{
+      height:auto;
+      /* 94vh (.dialog's own cap) minus a conservative reservation for
+         .dialog-top (~56px incl. margin) + .dialog-bottom's two rows with
+         a title wrapped to 3 lines (~78px) + the row-gap (16px) + the
+         bottom actions row (~44px) + .dialog's own padding (~20px) — with
+         some slack built in on top of that estimate. */
+      max-height:calc(94vh - 280px);
+    }
+    /* #lbCount moves out of here into .dialog-actions below (see
+       relocateLbCountForViewport) — .dialog-top-actions is the only child
+       left, so space-between (which assumed two children splitting the
+       row) would otherwise collapse it to the left instead of keeping it
+       pinned to the right. */
+    .dialog-top{justify-content:flex-end}
+    /* Two rows instead of desktop's single "title left, buttons right" row:
+       title+download on top, then prev/counter/next below it, centered —
+       matches the reference layout. Row 2 (.dialog-actions) is its own
+       independent flex row rather than sharing row 1's grid columns —
+       Prev and Next are the same width (44px icon buttons), so
+       justify-content:space-between naturally centers the counter between
+       them; sharing columns with row 1 instead would size the left/right
+       columns unevenly (Prev's 44px vs. Download's much wider pill),
+       visibly skewing the counter off-center. The counter (#lbCount) is
+       physically moved into .dialog-actions, between Prev and Next, by the
+       script below (see wpMobileSingleView) — it lives in .dialog-top
+       instead on desktop. */
     .dialog-bottom{
-      grid-template-columns:1fr;
-      align-items:stretch;
+      display:grid;
+      grid-template-columns:1fr auto;
+      grid-template-areas:
+        "title    download"
+        "actions  actions";
+      row-gap:16px;
+      align-items:start;
     }
     .dialog-actions{
-      justify-content:flex-end;
+      grid-area:actions;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
       width:100%;
     }
+    /* Full name, never truncated — wraps across as many lines as it needs
+       instead of clipping with an ellipsis (the max-height calc() above
+       already accounts for it running up to ~3 lines). */
     .dialog-title{
-      display:-webkit-box;
-      -webkit-box-orient:vertical;
-      -webkit-line-clamp:1;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:normal;
+      grid-area:title;
+      align-self:center;
     }
+    #lbDownload{grid-area:download; align-self:center;}
+    /* Plain centered counter text between the buttons, not the small pill
+       it is up in .dialog-top on desktop — space-between above already
+       does the centering (see .dialog-bottom comment), this just strips
+       the pill styling. */
+    #lbCount{
+      padding:0;
+      border:none;
+      background:none;
+      font-size:14px;
+    }
+
+    /* ---------- Mobile maximize: true edge-to-edge fullscreen ----------
+       On phones, stretching the framed modal taller (the desktop maximize
+       behavior) barely helps — the modal is already ~98vw wide, so there's
+       nowhere for it to grow into. Instead, maximize here drops the frame
+       entirely: the photo fills the whole screen, and the title/count/
+       action bars float on top as translucent overlays that fade away on
+       their own and reappear on a tap — the same shape as a native phone
+       photo viewer. Swiping down anywhere on the image closes it, since
+       the close button itself is hidden most of the time. */
+    .dialog.is-maximized{
+      position:fixed;
+      inset:0;
+      width:100vw;
+      height:100dvh;
+      max-height:100dvh;
+      margin:0;
+      padding:0;
+      border:none;
+      border-radius:0;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+      transition:transform .25s ease,opacity .2s ease;
+    }
+    .scrim:has(.dialog.is-maximized){
+      padding:0;
+      background:#000;
+      backdrop-filter:none;
+      -webkit-backdrop-filter:none;
+    }
+    .dialog.is-maximized .dialog-media{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      max-height:none;
+      aspect-ratio:auto;
+      border-radius:0;
+      border:none;
+    }
+    .dialog.is-maximized .dialog-top,
+    .dialog.is-maximized .dialog-bottom{
+      position:absolute;
+      left:0;
+      right:0;
+      z-index:5;
+      margin:0;
+      transition:opacity .3s ease,transform .3s ease;
+    }
+    .dialog.is-maximized .dialog-top{
+      top:0;
+      padding:14px 14px 26px;
+      background:linear-gradient(to bottom,rgba(0,0,0,.6),transparent);
+    }
+    .dialog.is-maximized .dialog-bottom{
+      bottom:0;
+      padding:26px 14px 14px;
+      background:linear-gradient(to top,rgba(0,0,0,.7),transparent);
+    }
+    /* Controls auto-hide (see the JS timer) or hide the instant the person
+       starts a swipe-to-close drag, so nothing half-fades mid-gesture. */
+    .dialog.is-maximized.chrome-hidden .dialog-top{
+      opacity:0;
+      transform:translateY(-10px);
+      pointer-events:none;
+    }
+    .dialog.is-maximized.chrome-hidden .dialog-bottom{
+      opacity:0;
+      transform:translateY(10px);
+      pointer-events:none;
+    }
+    .dialog.is-maximized .wp-carousel{touch-action:none}
   }
 
   /* Mobile performance: avoid expensive fixed blur/backdrop-filter layers and
@@ -1501,8 +1933,8 @@
     will-change:transform,box-shadow,border-radius,opacity;
   }
   .card:active{
-    transform:scale(.975) !important;
-    transition-duration:.12s !important;
+    transform:translateY(-2px) scale(.975) !important;
+    transition-duration:.15s !important;
   }
   .card.filter-hidden{
     opacity:0 !important;
@@ -1551,13 +1983,23 @@
     100%{opacity:1;transform:scale(1) rotate(0)}
   }
 
-  /* Surprise Me gets a tiny playful idle accent. */
-  .fab.expressive-pick{
+  /* Surprise Me gets a tiny playful idle accent — this runs continuously
+     for as long as the page is open, so it's built as a static box-shadow
+     on a pseudo-element that only animates opacity (compositor-only, no
+     per-frame repaint) instead of animating box-shadow itself, which
+     would force a full repaint every frame all session long. */
+  .fab.expressive-pick::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    border-radius:inherit;
+    box-shadow:0 0 0 5px color-mix(in srgb,var(--md-primary) 7%,transparent);
+    pointer-events:none;
     animation:fab-breathe 3.8s ease-in-out infinite;
   }
   @keyframes fab-breathe{
-    0%,100%{box-shadow:var(--elev-3)}
-    50%{box-shadow:var(--elev-3),0 0 0 5px color-mix(in srgb,var(--md-primary) 7%,transparent)}
+    0%,100%{opacity:0}
+    50%{opacity:1}
   }
   .fab.expressive-pick.is-picking{
     animation:fab-pick .5s cubic-bezier(.22,1.3,.36,1) both;
@@ -1567,6 +2009,75 @@
     35%{transform:scale(.9) rotate(-8deg)}
     70%{transform:scale(1.08) rotate(8deg)}
     100%{transform:scale(1) rotate(0)}
+  }
+  /* The shuffle icon spins for the whole flicker sequence, not just the
+     button's own squash-and-twist — makes the "searching" phase read as
+     intentional rather than just a bump. */
+  .fab.is-picking svg{
+    animation:fab-icon-spin .9s cubic-bezier(.3,0,.15,1);
+  }
+  @keyframes fab-icon-spin{
+    from{transform:rotate(0deg)}
+    to{transform:rotate(720deg)}
+  }
+
+  /* Slot-machine flicker across the grid while Surprise Me is "searching" —
+     a solid outline driven directly by JS add/remove of this class, so it
+     appears instantly (no fade-in ramp to miss on fast ticks) and stays
+     fully visible for exactly as long as the class is present. */
+  .card.is-flicker{
+    outline:3px solid color-mix(in srgb,var(--glow-color,var(--md-primary)) 85%,white 15%);
+    outline-offset:3px;
+  }
+  @media (prefers-reduced-motion:reduce){
+    .fab.is-picking svg{animation:none}
+  }
+
+  /* ---------- Click-triggered card pounce ----------
+     A quick squash-and-recover "paw pounce" that plays on a card the
+     instant it's tapped, right as the lightbox is opening over it — a
+     little extra life on the way in rather than the card just sitting
+     static under the dialog's fade. Added/removed by JS (see the card
+     click handlers), auto-cleared on 'animationend' so a fast double-tap
+     can always restart it cleanly. */
+  .card.card-pounce{
+    animation:card-pounce-anim .38s cubic-bezier(.24,1.5,.4,1);
+  }
+  @keyframes card-pounce-anim{
+    0%{transform:scale(1) rotate(0)}
+    35%{transform:scale(.93) rotate(-1.5deg)}
+    68%{transform:scale(1.045) rotate(1.5deg)}
+    100%{transform:scale(1) rotate(0)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .card.card-pounce{animation:none}
+  }
+
+  /* ---------- Roast Me mode ----------
+     Swaps each wallpaper's title for a sarcastic one-liner while the mode
+     is on. The card overlay (normally hidden — wallpaper names only show
+     in the lightbox, see .card-overlay above) is exposed only for cards
+     that currently have a roast caption assigned, so turning the mode on
+     reveals a caption directly on the grid instead of only in the dialog. */
+  body.roast-mode .card .card-overlay.has-roast{
+    display:flex;
+    align-items:flex-end;
+    padding:12px 14px;
+    background:linear-gradient(180deg,transparent 40%,rgba(8,10,7,.78) 100%);
+  }
+  body.roast-mode .card .card-title.is-roast{
+    font-style:italic;
+  }
+  .dialog-title.is-roast{
+    font-style:italic;
+  }
+  .dialog-title-real{
+    display:block;
+    margin-top:2px;
+    font-size:12px;
+    font-weight:500;
+    font-style:normal;
+    color:var(--md-on-surface-variant);
   }
 
   .dialog-count.expressive-count{
@@ -1746,31 +2257,6 @@
     max-width:100%;
   }
 
-  /* Small swipe hint only appears while a lightbox is open on touch devices. */
-  .dialog-media.swipe-ready::after{
-    content:"Swipe to browse";
-    position:absolute;
-    left:50%;
-    bottom:12px;
-    z-index:3;
-    transform:translateX(-50%);
-    padding:7px 11px;
-    border-radius:999px;
-    background:rgba(8,10,7,.48);
-    color:rgba(255,255,255,.78);
-    font-size:10px;
-    font-weight:650;
-    letter-spacing:.02em;
-    opacity:0;
-    animation:swipe-hint 1.9s ease .2s both;
-    pointer-events:none;
-  }
-  @keyframes swipe-hint{
-    0%{opacity:0;transform:translateX(-50%) translateY(4px)}
-    18%,65%{opacity:1;transform:translateX(-50%)}
-    100%{opacity:0;transform:translateX(-50%) translateY(2px)}
-  }
-
   /* Rotating little personality messages. */
   .subtitle.personality-change{
     animation:personality-change .42s cubic-bezier(.22,1.2,.36,1);
@@ -1783,9 +2269,6 @@
   @media (max-width:640px){
     .expressive-snackbar{
       bottom:calc(18px + env(safe-area-inset-bottom));
-    }
-    .dialog-media.swipe-ready::after{
-      bottom:8px;
     }
   }
 
@@ -1900,17 +2383,17 @@
   .dialog-top.expressive-update .dialog-count{
     animation:lb-text-pop .42s cubic-bezier(.175,.885,.32,1.35) both;
   }
+  /* #lbCount moves out of .dialog-top on mobile (see relocateLbCountForViewport),
+     so its pop is also triggered directly via this class from animateNavigation —
+     the ancestor-selector rule above only still reaches it on desktop. */
+  #lbCount.expressive-update-count{
+    animation:lb-text-pop .42s cubic-bezier(.175,.885,.32,1.35) both;
+  }
   @keyframes lb-text-pop{
     0%{opacity:.35;transform:translateY(6px) scale(.94)}
     70%{opacity:1;transform:translateY(-1px) scale(.995)}
     100%{opacity:1;transform:none}
   }
-
-  /* M3 expressive shape variations are randomized by JS. */
-  .dialog-actions .expressive-shape-a{border-radius:19px 25px 18px 23px}
-  .dialog-actions .expressive-shape-b{border-radius:25px 18px 23px 19px}
-  .dialog-actions .expressive-shape-c{border-radius:21px 27px 17px 24px}
-  .dialog-actions .expressive-shape-d{border-radius:28px 17px 24px 20px}
 
   @media (max-width:640px){
     .dialog-actions .icon-btn,
@@ -1930,7 +2413,8 @@
     .wp-track,
     .wp-item,
     .dialog-top.expressive-update .dialog-title,
-    .dialog-top.expressive-update .dialog-count{
+    .dialog-top.expressive-update .dialog-count,
+    #lbCount.expressive-update-count{
       animation:none !important;
       transition:none !important;
       transform:none !important;
@@ -2120,10 +2604,21 @@
       </div>
     </div>
 
-    <span class="eyebrow-chip">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2-6.3-4.6-6.3 4.6 2.3-7.2-6-4.6h7.6z"/></svg>
-      Curated gallery
-    </span>
+    <div class="topbar-end">
+      <span class="eyebrow-chip">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2-6.3-4.6-6.3 4.6 2.3-7.2-6-4.6h7.6z"/></svg>
+        Curated gallery
+      </span>
+      <div class="topbar-toggles">
+        <button type="button" class="icon-btn is-active" id="soundToggleBtn" aria-pressed="true" aria-label="Turn sound effects off">
+          <svg class="icon-sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+          <svg class="icon-sound-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+        </button>
+        <button type="button" class="icon-btn" id="roastToggleBtn" aria-pressed="false" aria-label="Turn on Roast Me captions">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5c-1 2-3.2 4-3.2 7.3a3.2 3.2 0 0 0 6.4 0c0-1-.4-1.7-.4-1.7s-.2 1.1-1 1.1c.5-1.6-.5-2.7-.5-3.8 0 0-1 .6-1 1.7-.5-.6-.5-1.7 0-3.3 0 0-.3-.7-.3-1.3z"/><path d="M9 13.2c-1.6 1-2.6 2.6-2.6 4.6a5.6 5.6 0 0 0 11.2 0c0-2.6-1.5-4.2-1.5-4.2s.1 1.8-1.1 2.5c.6-2.4-1-3.6-1-3.6"/></svg>
+        </button>
+      </div>
+    </div>
   </header>
   <div class="header-placeholder" id="headerPlaceholder" aria-hidden="true"></div>
   <button class="mobile-top-btn" id="mobileTopBtn" aria-label="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11l6-6 6 6"/><path d="M12 5v14"/></svg><span>Back to top</span></button>
@@ -2180,12 +2675,21 @@
     <div class="dialog">
       <div class="dialog-top">
         <span class="dialog-count" id="lbCount">1 / 1</span>
-        <button class="icon-btn" id="lbClose" aria-label="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
-        </button>
+        <div class="dialog-top-actions">
+          <button class="icon-btn" id="lbMaximize" aria-label="Maximize" aria-pressed="false">
+            <svg class="icon-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            <svg class="icon-restore" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><polyline points="9 3 9 9 3 9"/><polyline points="15 21 15 15 21 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          </button>
+          <button class="icon-btn" id="lbClose" aria-label="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+          </button>
+        </div>
       </div>
       <div class="dialog-media">
-        <div class="dialog-status" id="lbStatus">Loading…</div>
+        <div class="dialog-status" id="lbStatus">
+          <span class="lb-spinner" aria-hidden="true"></span>
+          <span class="lb-status-text" id="lbStatusText">Loading…</span>
+        </div>
         <div class="wp-carousel" id="wpCarousel">
           <div class="wp-track" id="wpTrack"></div>
         </div>
@@ -2200,8 +2704,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
           </button>
           <button class="filled-btn" id="lbDownload">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M4 19h16"/></svg>
-            Download
+            <svg class="icon-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M4 19h16"/></svg>
+            <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" hidden><polyline points="20 6 9 17 4 12"/></svg>
+            <span class="lb-download-label">Download</span>
           </button>
         </div>
       </div>
@@ -2276,23 +2781,6 @@ function normalizeFrame(frame){
  */
 const COLOR_SAMPLE_WIDTH = 112;
 
-function rgbToHsl(r,g,b){
-  r/=255; g/=255; b/=255;
-  const max=Math.max(r,g,b), min=Math.min(r,g,b);
-  let h=0, sat=0;
-  const l=(max+min)/2, d=max-min;
-  if(d!==0){
-    sat=l>0.5 ? d/(2-max-min) : d/(max+min);
-    switch(max){
-      case r: h=((g-b)/d)+(g<b?6:0); break;
-      case g: h=(b-r)/d+2; break;
-      default: h=(r-g)/d+4;
-    }
-    h*=60;
-  }
-  return {h,s:sat,l};
-}
-
 function rgbToHsv(r,g,b){
   r/=255; g/=255; b/=255;
   const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
@@ -2326,16 +2814,6 @@ const COLOR_CLASS_PALETTE = [
   {key:'blue',   rgb:[76,127,224],  hue:220},
   {key:'purple', rgb:[138,92,224],  hue:285},
 ];
-
-function hueDistance(a,b){
-  const d=Math.abs(a-b);
-  return Math.min(d,360-d);
-}
-
-function classifyColor(r,g,b){
-  const hsv=rgbToHsv(r,g,b);
-  return hueFamily(hsv.h);
-}
 
 /*
  * Matugen-style palette extraction:
@@ -2820,6 +3298,16 @@ function setCardFilterVisible(card, visible){
 
 function cardMatchesColorFilter(card){
   const frame=frameData[card.dataset.id];
+  if(frame && frame.isNew){
+    // New wallpapers live exclusively in the New Wallpapers section while
+    // browsing "All colors" - showing them in the main grid too would just
+    // duplicate them. Once a specific color is selected, though, the New
+    // section hides itself (see updateNewSectionVisibility), so this is the
+    // only place left to find them - they rejoin the main grid, filtered
+    // like everything else, still carrying the New badge from buildCard.
+    if(activeColor===null) return false;
+    return !!(frame.colorKey && frame.colorKey===activeColor);
+  }
   return activeColor===null || !!(frame && frame.colorKey && frame.colorKey===activeColor);
 }
 
@@ -2917,7 +3405,37 @@ function observeAllCardReveals(){
 }
 
 function applyColorFilter(){
-  grid.querySelectorAll('.card').forEach(applyColorFilterToCard);
+  // Batched version of setCardFilterVisible's "show" path: calling
+  // applyColorFilterToCard per-card here previously forced a synchronous
+  // layout reflow (void card.offsetWidth) once for every single card being
+  // revealed, one after another — on a large gallery that's dozens of
+  // forced reflows for one filter click. All the "reveal" writes now happen
+  // first, then a single reflow covers the whole batch, then every card's
+  // fade-in class is removed on the same frame — same end state and timing
+  // as before, just without the per-card layout thrashing.
+  const cards = grid.querySelectorAll('.card');
+  const toReveal = [];
+  cards.forEach(card=>{
+    const visible = cardMatchesColorFilter(card);
+    if(visible){
+      if(card.hidden){
+        card.hidden = false;
+        card.classList.add('filter-hidden');
+        toReveal.push(card);
+      }
+    }else{
+      if(!card.hidden){
+        card.classList.add('filter-hidden');
+        window.setTimeout(()=>{
+          if(card.classList.contains('filter-hidden')) card.hidden = true;
+        }, 220);
+      }
+    }
+  });
+  if(toReveal.length){
+    void grid.offsetWidth; // single forced reflow for the whole batch
+    requestAnimationFrame(()=> toReveal.forEach(card => card.classList.remove('filter-hidden')));
+  }
   observeAllCardReveals();
   prepareCardImages(grid);
 }
@@ -2949,6 +3467,7 @@ function setActiveColor(key){
   applyColorTheme(activeColor);
   updateChipStates();
   applyColorFilter();
+  updateNewSectionVisibility();
 
   // Keep the original filter behavior: selecting a color returns the
   // collection to the top so the active filter and results are immediately visible.
@@ -3041,6 +3560,7 @@ function resetColorFilterUI(total){
     colorFilterTrack.removeAttribute('aria-busy');
   }
   updateChipStates();
+  updateNewSectionVisibility();
 }
 
 async function computeAllFrameColors(frames, generation){
@@ -3082,6 +3602,226 @@ let renderGeneration = 0;
  */
 const newSection = document.getElementById('newSection');
 const newGrid = document.getElementById('newGrid');
+// Whether the current manifest has any wallpapers less than a week old.
+// Tracked separately from newSection.hidden itself because visibility also
+// depends on activeColor (see updateNewSectionVisibility) - this flag is
+// the "are there any at all" half of that, refreshed once per render.
+let hasNewFrames = false;
+
+// The New Wallpapers section is an "All colors" showcase only: picking a
+// specific color filter hides it, since a color-filtered view of only-new
+// arrivals isn't a useful browsing mode on its own (see cardMatchesColorFilter,
+// which is what surfaces new wallpapers into the main grid instead once a
+// color is active). Called after every color-filter change and re-render.
+function updateNewSectionVisibility(){
+  if(!newSection) return;
+  newSection.hidden = !hasNewFrames || activeColor !== null;
+}
+
+/* ---------- Sound effects ----------
+ * Small synthesized cues (no audio files to fetch) for a card tap, a
+ * successful download, and the surprise-me flourish. On by default and
+ * toggled from the speaker button in the header; the choice is remembered
+ * per browser via localStorage the same way the color/theme prefs are.
+ * Everything routes through playTone(), which no-ops immediately if sound
+ * is off, so every call site can fire-and-forget without checking the
+ * toggle itself.
+ */
+const SOUND_PREF_KEY = 'blapples-wallpaper-sound-v1';
+// On by default; only stays off across reloads if the person explicitly
+// turned it off before (an explicit 'off' is the only thing that beats
+// the default — anything else, including no stored value at all, means on).
+let soundEnabled = true;
+try{ soundEnabled = localStorage.getItem(SOUND_PREF_KEY) !== 'off'; }catch(err){}
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx){
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return null;
+    audioCtx = new Ctx();
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+  return audioCtx;
+}
+function playTone({freq=440, sweep=null, duration=0.12, type='sine', gain=0.05, delay=0}={}){
+  if(!soundEnabled) return;
+  try{
+    const ctx = getAudioCtx();
+    if(!ctx) return;
+    const t0 = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if(sweep) osc.frequency.exponentialRampToValueAtTime(Math.max(20,sweep), t0 + duration);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.03);
+  }catch(err){ /* Audio is best-effort; never let it break navigation. */ }
+}
+// A quick two-note "mew" chirp — pitch rising then falling, evoking a
+// little cat sound without needing a real audio sample.
+function playCardClickSound(){
+  playTone({freq:520, sweep:820, duration:.08, type:'sine', gain:.05});
+  playTone({freq:760, sweep:480, duration:.1, type:'sine', gain:.035, delay:.06});
+}
+function playDownloadSound(){
+  playTone({freq:520, duration:.11, type:'triangle', gain:.05});
+  playTone({freq:784, duration:.16, type:'triangle', gain:.055, delay:.09});
+}
+function playSurpriseTickSound(){
+  playTone({freq:280 + Math.random()*140, duration:.04, type:'square', gain:.018});
+}
+function playSurpriseLandSound(){
+  playTone({freq:440, sweep:880, duration:.22, type:'sine', gain:.05});
+}
+
+const soundToggleBtn = document.getElementById('soundToggleBtn');
+function setSoundEnabled(on){
+  soundEnabled = on;
+  try{ localStorage.setItem(SOUND_PREF_KEY, on ? 'on' : 'off'); }catch(err){}
+  if(soundToggleBtn){
+    soundToggleBtn.classList.toggle('is-active', on);
+    soundToggleBtn.setAttribute('aria-pressed', String(on));
+    soundToggleBtn.setAttribute('aria-label', on ? 'Turn sound effects off' : 'Turn sound effects on');
+  }
+  // Unlock/resume the AudioContext on the same user gesture that turned
+  // sound on — browsers block audio from starting without one.
+  if(on) getAudioCtx();
+}
+if(soundToggleBtn){
+  setSoundEnabled(soundEnabled);
+  soundToggleBtn.addEventListener('click', ()=> setSoundEnabled(!soundEnabled));
+}
+
+/* ---------- Click-triggered card pounce ----------
+ * A quick squash-and-recover animation (see .card-pounce in CSS) that
+ * plays the instant a card is tapped, while the lightbox is still fading
+ * in over it. Removed on 'animationend' rather than via a fixed timeout so
+ * a rapid re-click always restarts cleanly. */
+function triggerCardPounce(card){
+  if(!card) return;
+  card.classList.remove('card-pounce');
+  void card.offsetWidth; // restart the animation if it's already mid-run
+  card.classList.add('card-pounce');
+  card.addEventListener('animationend', function handler(){
+    card.classList.remove('card-pounce');
+    card.removeEventListener('animationend', handler);
+  });
+}
+
+/* ---------- Roast Me mode ----------
+ * Swaps every wallpaper's title for a sarcastic one-liner, on the card
+ * overlay and in the lightbox, while the mode is on. Off by default and
+ * toggled from the flame button in the header; the choice persists the
+ * same way the sound preference does. Each wallpaper's line is picked
+ * deterministically from its filename (a small string hash) so a given
+ * wallpaper keeps the same roast across reloads instead of reshuffling —
+ * the joke is meant to belong to that wallpaper, not be random noise.
+ */
+const ROAST_MODE_KEY = 'blapples-wallpaper-roast-v1';
+let roastMode = false;
+try{ roastMode = localStorage.getItem(ROAST_MODE_KEY) === 'on'; }catch(err){}
+
+const ROAST_LINES = [
+  "Downloaded by people who also alphabetize their spice rack.",
+  "Your lock screen called. It wants a personality too.",
+  "Peak main-character energy, questionable execution.",
+  "This wallpaper has more layers than your last group chat drama.",
+  "Certified 'I saw this on Pinterest at 2am' behavior.",
+  "Looks expensive. Was, in fact, free.",
+  "The kind of aesthetic that peaked in 2019 and never quite left.",
+  "Your phone deserves better. This will have to do.",
+  "Screenshot this before it gets discontinued from vibes.",
+  "It's giving main quest, not side character.",
+  "This background has seen things. Mostly your unread notifications.",
+  "Objectively an 8/10. The cat rated it lower.",
+  "Somewhere, a minimalist is quietly disappointed.",
+  "This is what your therapist meant by 'setting boundaries'.",
+  "10/10 would stare blankly at during a work call.",
+  "Not everything needs a caption. This one insisted anyway.",
+  "Warning: may cause a sudden urge to reorganize your home screen.",
+  "This wallpaper pays its bills on time. Unlike some people.",
+  "A bold choice. Bold is one word for it.",
+  "Looks like it cost $40. It's free. You're welcome.",
+];
+function hashString(str){
+  let h = 0;
+  for(let i=0;i<str.length;i++) h = (Math.imul(31,h) + str.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+function roastForFrame(frame){
+  if(!frame) return '';
+  if(!frame.roastLine){
+    const key = frame.filename || frame.title || String(frame.frameNo);
+    frame.roastLine = ROAST_LINES[hashString(key) % ROAST_LINES.length];
+  }
+  return frame.roastLine;
+}
+function applyRoastToCardElements(frame){
+  if(!frame) return;
+  if(frame._titleEl){
+    frame._titleEl.textContent = roastMode ? roastForFrame(frame) : frame.title;
+    frame._titleEl.classList.toggle('is-roast', roastMode);
+  }
+  if(frame._overlayEl){
+    frame._overlayEl.classList.toggle('has-roast', roastMode);
+  }
+}
+function applyRoastToAllCards(){
+  Object.values(frameData).forEach(applyRoastToCardElements);
+}
+function setLightboxTitle(frame){
+  if(!frame || !lbTitle) return;
+  lbTitle.classList.toggle('is-roast', roastMode);
+  if(roastMode){
+    lbTitle.textContent = '';
+    const roastSpan = document.createElement('span');
+    roastSpan.textContent = roastForFrame(frame);
+    const realSpan = document.createElement('span');
+    realSpan.className = 'dialog-title-real';
+    realSpan.textContent = frame.title;
+    lbTitle.append(roastSpan, realSpan);
+  }else{
+    lbTitle.textContent = frame.title;
+  }
+}
+
+const roastToggleBtn = document.getElementById('roastToggleBtn');
+function setRoastMode(on){
+  roastMode = on;
+  try{ localStorage.setItem(ROAST_MODE_KEY, on ? 'on' : 'off'); }catch(err){}
+  document.body.classList.toggle('roast-mode', roastMode);
+  if(roastToggleBtn){
+    roastToggleBtn.classList.toggle('is-active', roastMode);
+    roastToggleBtn.setAttribute('aria-pressed', String(roastMode));
+    roastToggleBtn.setAttribute('aria-label', roastMode ? 'Turn off Roast Me captions' : 'Turn on Roast Me captions');
+  }
+  applyRoastToAllCards();
+  // Keep an already-open lightbox title in sync instead of waiting for the
+  // next navigation to pick up the mode change.
+  if(lightbox && !lightbox.hidden && currentIndex >= 0){
+    const pool = getPool(lightboxPoolMode);
+    const el = pool[currentIndex];
+    const frame = el && frameData[el.dataset.id];
+    if(frame) setLightboxTitle(frame);
+  }
+}
+if(roastToggleBtn){
+  // Sync the button/body state immediately without going through
+  // setRoastMode() itself — that function also touches the lightbox
+  // (to live-update an already-open dialog), and lightbox/currentIndex/
+  // getPool aren't declared until further down this script, so calling it
+  // this early would hit them before initialization.
+  document.body.classList.toggle('roast-mode', roastMode);
+  roastToggleBtn.classList.toggle('is-active', roastMode);
+  roastToggleBtn.setAttribute('aria-pressed', String(roastMode));
+  roastToggleBtn.setAttribute('aria-label', roastMode ? 'Turn off Roast Me captions' : 'Turn on Roast Me captions');
+  roastToggleBtn.addEventListener('click', ()=> setRoastMode(!roastMode));
+}
 
 function buildNewBadge(){
   const badge = document.createElement('span');
@@ -3089,6 +3829,165 @@ function buildNewBadge(){
   badge.textContent = 'New';
   badge.setAttribute('aria-hidden', 'true');
   return badge;
+}
+
+/* ---------- Card hover/long-press preview ----------
+ * Desktop: hovering a card for a moment shows a floating preview of the
+ * full, uncropped image near the cursor (the grid tile itself is cropped
+ * to a square/rectangle via object-fit:cover, so this is the only way to
+ * see the whole shot without opening it). Touch: a long-press shows the
+ * same preview centered on screen; releasing dismisses it without
+ * navigating, while a normal short tap still opens the lightbox exactly
+ * as before. Both paths share one floating element and one suppression
+ * flag so the click handler can tell "long-press just happened" apart
+ * from "this was a real tap".
+ */
+const cardPreviewEl = document.createElement('div');
+cardPreviewEl.className = 'card-preview-float';
+cardPreviewEl.setAttribute('aria-hidden', 'true');
+const cardPreviewImg = document.createElement('img');
+cardPreviewImg.alt = '';
+cardPreviewEl.appendChild(cardPreviewImg);
+document.body.appendChild(cardPreviewEl);
+
+const supportsHoverPreview = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+let hoverPreviewTimer = null;
+let hoverPreviewCard = null;
+let longPressTimer = null;
+let longPressActive = false;
+let suppressNextCardClick = false;
+
+function positionCardPreview(x, y){
+  // Offset from the cursor and clamped to the viewport so the preview
+  // never gets clipped off the edge of the screen near the grid borders.
+  const margin = 16;
+  const rect = cardPreviewEl.getBoundingClientRect();
+  const w = rect.width || 320;
+  const h = rect.height || 320;
+  let left = x + 18;
+  let top = y + 18;
+  if(left + w + margin > window.innerWidth) left = x - w - 18;
+  if(top + h + margin > window.innerHeight) top = y - h - 18;
+  left = Math.max(margin, Math.min(left, window.innerWidth - w - margin));
+  top = Math.max(margin, Math.min(top, window.innerHeight - h - margin));
+  cardPreviewEl.style.transform = cardPreviewEl.classList.contains('is-visible')
+    ? `translate(${left}px, ${top}px) scale(1)`
+    : `translate(${left}px, ${top}px) scale(.94)`;
+}
+function showCardPreview(frame, x, y, touch=false){
+  if(!frame) return;
+  cardPreviewImg.src = frame.previewSrc || frame.src;
+  cardPreviewImg.alt = frame.title || '';
+  cardPreviewEl.classList.toggle('is-touch', touch);
+  if(touch){
+    cardPreviewEl.style.left = '50%';
+    cardPreviewEl.style.top = '50%';
+    cardPreviewEl.style.transform = 'translate(-50%,-50%) scale(.94)';
+    requestAnimationFrame(()=>{
+      cardPreviewEl.classList.add('is-visible');
+      cardPreviewEl.style.transform = 'translate(-50%,-50%) scale(1)';
+    });
+  }else{
+    cardPreviewEl.style.left = '0';
+    cardPreviewEl.style.top = '0';
+    positionCardPreview(x, y);
+    requestAnimationFrame(()=>{
+      cardPreviewEl.classList.add('is-visible');
+      positionCardPreview(x, y);
+    });
+  }
+}
+function hideCardPreview(){
+  cardPreviewEl.classList.remove('is-visible');
+  hoverPreviewCard = null;
+}
+
+// Attaches the hover/long-press preview behavior to one card. Shared by
+// both buildCard and buildNewSectionCard so the two grids behave the same.
+function wireCardPreview(card, frame){
+  if(supportsHoverPreview){
+    card.addEventListener('pointerenter', e => {
+      if(e.pointerType !== 'mouse') return;
+      clearTimeout(hoverPreviewTimer);
+      hoverPreviewTimer = setTimeout(()=>{
+        hoverPreviewCard = card;
+        showCardPreview(frame, e.clientX, e.clientY, false);
+      }, 450);
+    });
+    card.addEventListener('pointermove', e => {
+      if(e.pointerType !== 'mouse') return;
+      if(hoverPreviewCard === card) positionCardPreview(e.clientX, e.clientY);
+    });
+    card.addEventListener('pointerleave', () => {
+      clearTimeout(hoverPreviewTimer);
+      if(hoverPreviewCard === card) hideCardPreview();
+    });
+  }
+
+  // Touch long-press: a hold with (almost) no movement shows the preview;
+  // releasing after that dismisses it and suppresses the click that would
+  // otherwise follow, so a long-press never also opens the lightbox.
+  let startX = 0, startY = 0, moved = false;
+  card.addEventListener('pointerdown', e => {
+    if(e.pointerType === 'mouse') return;
+    startX = e.clientX; startY = e.clientY;
+    moved = false;
+    longPressActive = false;
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(()=>{
+      if(moved) return;
+      longPressActive = true;
+      showCardPreview(frame, e.clientX, e.clientY, true);
+    }, 480);
+  });
+  card.addEventListener('pointermove', e => {
+    if(e.pointerType === 'mouse') return;
+    if(Math.abs(e.clientX-startX) > 10 || Math.abs(e.clientY-startY) > 10){
+      moved = true;
+      clearTimeout(longPressTimer);
+    }
+  });
+  const endLongPress = e => {
+    if(e && e.pointerType === 'mouse') return;
+    clearTimeout(longPressTimer);
+    if(longPressActive){
+      hideCardPreview();
+      suppressNextCardClick = true;
+    }
+    longPressActive = false;
+  };
+  card.addEventListener('pointerup', endLongPress);
+  card.addEventListener('pointercancel', endLongPress);
+}
+
+/* ---------- Cursor trail ----------
+ * A faint trail of little paw marks follows the pointer while it moves
+ * over the gallery grid — desktop only, purely decorative, and throttled
+ * to a low spawn rate so it never turns into a flood of DOM elements; each
+ * mark fades out well before the throttle window would let another spawn
+ * at the same spot anyway. */
+if(supportsHoverPreview && !window.matchMedia('(prefers-reduced-motion:reduce)').matches){
+  let lastTrailSpawn = 0;
+  const TRAIL_MIN_INTERVAL_MS = 90;
+  grid.addEventListener('pointermove', e => {
+    if(e.pointerType !== 'mouse') return;
+    const now = performance.now();
+    if(now - lastTrailSpawn < TRAIL_MIN_INTERVAL_MS) return;
+    lastTrailSpawn = now;
+    spawnTrailPiece(e.clientX, e.clientY);
+  });
+}
+function spawnTrailPiece(x, y){
+  const piece = document.createElement('div');
+  piece.className = 'cursor-trail-piece';
+  piece.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" width="100%" height="100%" aria-hidden="true"><circle cx="12" cy="15.5" r="5"/><circle cx="5" cy="8" r="2.3"/><circle cx="10" cy="4.5" r="2.3"/><circle cx="14.5" cy="4.5" r="2.3"/><circle cx="19" cy="8" r="2.3"/></svg>';
+  document.body.appendChild(piece);
+  const anim = piece.animate([
+    { transform:`translate(${x-7}px, ${y-7}px) scale(.55)`, opacity:.5 },
+    { transform:`translate(${x-7}px, ${y+12}px) scale(1)`, opacity:0 }
+  ], { duration:650, easing:'ease-out', fill:'forwards' });
+  anim.onfinish = () => piece.remove();
+  setTimeout(()=> piece.remove(), 750); // fallback cleanup, see fireConfetti for the same pattern
 }
 
 function buildNewSectionCard(frame){
@@ -3102,11 +4001,27 @@ function buildNewSectionCard(frame){
   img.src = frame.previewSrc || makePreviewUrl(frame.src, CARD_PREVIEW_WIDTH);
   prepareCardImage(img);
 
-  card.append(img, buildNewBadge());
+  const overlay = document.createElement('div');
+  overlay.className = 'card-overlay';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'card-title';
+  titleEl.textContent = frame.title;
+  overlay.appendChild(titleEl);
+  frame._overlayEl = overlay;
+  frame._titleEl = titleEl;
+
+  card.append(img, overlay, buildNewBadge());
   // New Wallpapers has its own lightbox pool so the counter/navigation
   // stays within the new arrivals instead of falling back to All Colors.
-  card.addEventListener('click', ()=> openLightbox(frame.frameNo, 'new'));
+  card.addEventListener('click', ()=>{
+    if(suppressNextCardClick){ suppressNextCardClick = false; return; }
+    playCardClickSound();
+    triggerCardPounce(card);
+    openLightbox(frame.frameNo, 'new');
+  });
+  wireCardPreview(card, frame);
   observeCardReveal(card);
+  applyRoastToCardElements(frame);
   return card;
 }
 
@@ -3115,20 +4030,26 @@ function renderNewSection(frames){
   const newFrames = frames.filter(frame => frame.isNew);
 
   newGrid.innerHTML = '';
-  if(!newFrames.length){
-    newSection.hidden = true;
+  hasNewFrames = newFrames.length > 0;
+  if(!hasNewFrames){
+    updateNewSectionVisibility();
     return;
   }
 
-  newSection.hidden = false;
   const frag = document.createDocumentFragment();
   newFrames.forEach(frame => frag.appendChild(buildNewSectionCard(frame)));
   newGrid.appendChild(frag);
+  updateNewSectionVisibility();
 
-  // Let the section announce itself as a fresh collection.
-  newSection.classList.remove('expressive-arrival');
-  void newSection.offsetWidth;
-  newSection.classList.add('expressive-arrival');
+  // Let the section announce itself as a fresh collection - only worth doing
+  // if the section is actually visible right now (a color filter may be
+  // active, in which case it's still hidden and the animation would be
+  // wasted/invisible).
+  if(!newSection.hidden){
+    newSection.classList.remove('expressive-arrival');
+    void newSection.offsetWidth;
+    newSection.classList.add('expressive-arrival');
+  }
 }
 
 function renderFrames(frames, usingPlaceholders=false, isAuthoritative=true){
@@ -3219,6 +4140,14 @@ function buildCard(frame, idx, usingPlaceholders){
   // is intentionally never assigned to the card image.
   img.src = frame.previewSrc || makePreviewUrl(frame.src, CARD_PREVIEW_WIDTH);
 
+  // This image already has its own native loading='lazy'/fetchPriority
+  // strategy above. Mark it as already handled so the grid MutationObserver
+  // (which calls prepareCardImage on every newly-added card, for the
+  // color-filter/lazy system) doesn't strip the src it just got and re-gate
+  // it behind the IntersectionObserver - that would cancel/duplicate the
+  // fetch and defeat fetchPriority='high' on the first visible cards.
+  img.dataset.lazyPrepared = 'true';
+
   if(img.complete && img.naturalWidth){
     frame.width = img.naturalWidth;
     frame.height = img.naturalHeight;
@@ -3239,15 +4168,24 @@ function buildCard(frame, idx, usingPlaceholders){
   titleEl.className = 'card-title';
   titleEl.textContent = frame.title;
   overlay.appendChild(titleEl);
+  frame._overlayEl = overlay;
+  frame._titleEl = titleEl;
 
   card.append(img, overlay);
   if(frame.isNew) card.appendChild(buildNewBadge());
-  card.addEventListener('click', ()=> openLightbox(frame.frameNo));
+  card.addEventListener('click', ()=>{
+    if(suppressNextCardClick){ suppressNextCardClick = false; return; }
+    playCardClickSound();
+    triggerCardPounce(card);
+    openLightbox(frame.frameNo);
+  });
+  wireCardPreview(card, frame);
   grid.appendChild(card);
   frame._card=card;
   // Chunked rendering can continue after a filter is selected, so every new
   // card must be filtered immediately instead of waiting for a second click.
   applyColorFilterToCard(card);
+  applyRoastToCardElements(frame);
   revealObserver.observe(card);
 }
 
@@ -3321,9 +4259,49 @@ async function init(){
 }
 init();
 
-/* ---------- Surprise me ---------- */
+/* ---------- Button press ripple ---------- */
+function spawnRipple(x, y, el){
+  const rect = el.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height) * 1.6;
+  const span = document.createElement('span');
+  span.className = 'ripple';
+  span.style.width = span.style.height = size + 'px';
+  span.style.left = (x - rect.left - size / 2) + 'px';
+  span.style.top = (y - rect.top - size / 2) + 'px';
+  el.appendChild(span);
+  span.addEventListener('animationend', () => span.remove());
+}
+document.addEventListener('pointerdown', e => {
+  const el = e.target.closest('.icon-btn, .filled-btn, .fab');
+  if(!el || el.disabled) return;
+  spawnRipple(e.clientX, e.clientY, el);
+});
+
+/* ---------- Surprise me ----------
+   An arcade prize-wheel flourish: the highlight travels card-by-card
+   through the grid in order (like a chase light / slot reel), doing a
+   couple of full laps and then decelerating — same way a claw-machine
+   or raffle light slows to a stop — before landing exactly on the real
+   pick, which then gets the scroll + pulse treatment. */
+// Looks up the swatch hex for a card's assigned color-filter bucket, so
+// the surprise-me glow/stroke effects always match the same palette the
+// color chips use. Falls back to null (CSS then falls back to the
+// default primary/olive tone) when a card hasn't been color-classified.
+function glowColorForCard(card){
+  const frame = frameData[card.dataset.id];
+  const bucket = frame && COLOR_BUCKETS.find(b=>b.key===frame.colorKey);
+  return bucket ? bucket.swatch : null;
+}
+
+function setGlowColor(card, hex){
+  if(hex) card.style.setProperty('--glow-color', hex);
+  else card.style.removeProperty('--glow-color');
+}
+
 document.getElementById('surpriseBtn').addEventListener('click', ()=>{
   const btn = document.getElementById('surpriseBtn');
+  if(btn.classList.contains('is-picking')) return; // ignore rapid re-clicks mid-flourish
+
   const cards = Array.from(grid.querySelectorAll('.card'))
     .filter(card=>!card.classList.contains('filter-hidden') && !card.hidden);
   if(!cards.length) return;
@@ -3332,20 +4310,82 @@ document.getElementById('surpriseBtn').addEventListener('click', ()=>{
   void btn.offsetWidth;
   btn.classList.add('is-picking');
 
-  const pick = cards[Math.floor(Math.random()*cards.length)];
-  pick.scrollIntoView({ behavior:'smooth', block:'center' });
-  pick.classList.add('pulse');
+  const finalIndex = Math.floor(Math.random()*cards.length);
+  const finalPick = cards[finalIndex];
+  const finalGlow = glowColorForCard(finalPick);
 
-  setTimeout(()=>{
-    pick.classList.remove('pulse');
-    btn.classList.remove('is-picking');
-    openLightbox(pick.dataset.id);
-  }, 520);
+  const settle = () => {
+    finalPick.scrollIntoView({ behavior:'smooth', block:'center' });
+    setTimeout(() => {
+      finalPick.classList.remove('is-flicker');
+      finalPick.classList.add('pulse');
+      setTimeout(()=>{
+        finalPick.classList.remove('pulse');
+        setGlowColor(finalPick, null);
+        btn.classList.remove('is-picking');
+        openLightbox(finalPick.dataset.id);
+      }, 350); // brief pulse, then open — no need to wait out the full 1s ring
+    }, 450); // scroll immediately with the stroke still on, so it's visible on the way in; then switch glow -> pulse once it's landed
+  };
+
+  if(cards.length === 1){
+    setGlowColor(finalPick, finalGlow);
+    finalPick.classList.add('is-flicker');
+    playSurpriseLandSound();
+    settle();
+    return;
+  }
+
+  // Fixed number of ticks regardless of how many wallpapers are loaded, so
+  // the flourish always takes ~2s whether the grid has 8 cards or 200 —
+  // it samples positions across a couple of "laps" of the grid via an
+  // ease-out curve (fast at first, slowing down) rather than stepping one
+  // card at a time, which is what made it crawl on large collections.
+  const startIndex = (finalIndex + 1 + Math.floor(Math.random()*(cards.length-1))) % cards.length;
+  const laps = cards.length > 3 ? 2 : 1;
+  const distance = (finalIndex - startIndex + cards.length) % cards.length;
+  const totalDistance = distance + cards.length * laps;
+  const ticks = 16;
+  const easeOutCubic = t => 1 - Math.pow(1-t, 3);
+
+  let tickNum = 0;
+  let prevFlicker = null; // tracked directly instead of querying the DOM each tick
+
+  const tick = () => {
+    if(prevFlicker){
+      prevFlicker.classList.remove('is-flicker');
+      setGlowColor(prevFlicker, null);
+    }
+
+    const isFinal = tickNum === ticks;
+    const idx = isFinal ? finalIndex
+      : (startIndex + Math.round(easeOutCubic(tickNum/ticks) * totalDistance)) % cards.length;
+    const card = cards[idx];
+
+    setGlowColor(card, isFinal ? finalGlow : glowColorForCard(card));
+    card.classList.add('is-flicker');
+    prevFlicker = card;
+
+    if(isFinal){
+      playSurpriseLandSound();
+      settle(); // scroll to it right away so the stroke is visible on the way into view
+    } else {
+      playSurpriseTickSound();
+      tickNum++;
+      // Ease-out timing too: quick ticks at the start, stretching out
+      // toward the end, like a wheel losing momentum and settling.
+      const t = tickNum / ticks;
+      setTimeout(tick, 55 + Math.pow(t, 3) * 260);
+    }
+  };
+  tick();
 });
 
 /* ---------- Lightbox ---------- */
 const lightbox = document.getElementById('lightbox');
 const lbStatus = document.getElementById('lbStatus');
+const lbStatusText = document.getElementById('lbStatusText');
+const lbSpinner = document.querySelector('#lbStatus .lb-spinner');
 const lbTitle = document.getElementById('lbTitle');
 const lbCount = document.getElementById('lbCount');
 const lbDownload = document.getElementById('lbDownload');
@@ -3378,7 +4418,13 @@ function openLightbox(id, mode = 'main'){
   lightbox.hidden = false;
   document.body.style.overflow = 'hidden';
   wpPoolIds = null; // force a fresh carousel build for the new pool
-  renderLightbox(pool);
+  wpLastPunchedIndex = -1;
+  // null (not 1 or -1) marks "no move made yet this session" — so whichever
+  // way the person first steps from the opening tile is treated like a
+  // reversal too, giving that origin tile its one-frame echo peek instead
+  // of vanishing outright. See the reversed checks in goToIndex/stepLightbox.
+  wpDirection = null;
+  renderLightbox(pool, true); // skip the debounce on the very first open — only rapid Next/Prev needs it
 }
 
 /* ---------- Hero carousel (Material 3 "carousel" style) ----------
@@ -3391,67 +4437,151 @@ function openLightbox(id, mode = 'main'){
    "flush against the edge" look at the very start and very end of the
    list, mirrored on either side. */
 const WP_GAP = 10;
+// Matches the .wp-item width transition's duration in CSS (.38s). The image
+// swap below is timed off this so it lands after the resize has visually
+// settled, instead of overlapping it — see the comment at runHeavyWork.
+const WP_RESIZE_MS = 380;
 let wpPoolIds = null;
 let wpDragging = false;
+let wpLastPunchedIndex = -1;
 let wpDragMoved = false;
 let wpDragStartX = 0;
 let wpDragBase = 0;
+// Rubber-band bounds for the drag in progress, cached at pointerdown (see
+// below) instead of being recomputed — item widths plus a clientWidth
+// layout read — on every single pointermove of the drag.
+let wpDragMinT = 0;
+// Which way the person is currently browsing: 1 = toward the end of the
+// list (their most recent move was Next, or a forward swipe/tap), -1 =
+// toward the beginning (Previous). null = no move made yet since opening
+// (treated like a reversal on whichever way the first move goes — see the
+// reversed checks below). The big 30% "runner-up" tile and the cascade of
+// 10% pills always sit on the side the person is heading toward — so this
+// flips which side gets which treatment.
+let wpDirection = null;
+// When the person reverses direction (their previous move was Next and this
+// one is Previous, or vice versa), the tile they're leaving behind would
+// otherwise instantly collapse to width 0 while a whole cascade pops in on
+// the opposite side — a jarring double-pop. wpEchoIndex softens that one
+// step: it names the tile just left, which gets a small 10% "echo" pill on
+// the trailing edge instead of vanishing outright. It's set for exactly one
+// render (the reversal step itself) and cleared right after, so continuing
+// in the same new direction goes straight back to the plain 60/30/10 cascade.
+let wpEchoIndex = null;
 // On phones/touch devices, navigation should only happen via the explicit
 // Previous/Next buttons — no swiping the strip and no tapping the image to
 // jump to another wallpaper. Desktop pointer (mouse) drag-to-browse is kept.
 const wpIsTouchNav = window.matchMedia('(pointer:coarse)').matches;
 
-// Each tile's width is a percentage of the carousel's own width, chosen by
-// where the active tile sits in the pool — not just a flat distance taper:
-//  - Active tile at the very start of the pool: 60% / 30% / 10% reading
-//    left-to-right (active, then its next two neighbors), since there's no
-//    earlier wallpaper to show on the left.
-//  - Active tile at the very end of the pool: the mirror image of that,
-//    10% / 30% / 60% reading left-to-right (its previous two neighbors,
-//    then active last).
-//  - Active tile anywhere in between: 30% / 60% / 10% — the immediate
-//    previous wallpaper, the active one, then a small hint of the next one.
-//  - Pools of exactly two wallpapers (e.g. a freshly-uploaded pair) only
-//    ever show two tiles, so it's just 70% active / 30% the other one.
-// This is the *entire* visible set — nothing beyond those named tiles gets
-// any width, so the carousel always reads as exactly 3 cards (or 2, for a
-// 2-wallpaper pool), consistently, the whole way from the first wallpaper
-// to the last.
-function wpItemFraction(i, activeIndex, poolLen){
+// Below this width, the carousel shows only its active tile (see the
+// max-width:760px ".wp-item{display:none}" rule) instead of the peek
+// cascade — a plain single-photo viewer instead of a browsing strip.
+// layoutCarousel checks this to skip the now-inapplicable peek-width/
+// translate math (see the "mobile single view" branch there), and the code
+// below uses it to reshuffle the bottom bar into two rows: title+Download
+// on top, Prev/counter/Next below. #lbCount and #lbDownload each move to a
+// different parent than they have on desktop (#lbCount out of .dialog-top,
+// #lbDownload out of .dialog-actions) purely for that "which row is it in"
+// reason, not because their own behavior changes — simplest to physically
+// move the two elements for that rather than keep duplicates in sync.
+const wpMobileSingleView = window.matchMedia('(max-width:760px)');
+const lbCountDesktopHome = lbCount.parentNode;
+const lbDownloadDesktopHome = lbDownload.parentNode;
+const lbDownloadDesktopNextSibling = lbDownload.nextSibling;
+const dialogBottomEl = document.querySelector('.dialog-bottom');
+const dialogActionsEl = document.querySelector('.dialog-actions');
+const lbNextBtn = document.getElementById('lbNext');
+function relocateLbCountForViewport(){
+  if(wpMobileSingleView.matches){
+    // Row 2: Prev / counter / Next, in that order, as the only three
+    // children of .dialog-actions — its flex justify-content:space-between
+    // then centers the counter between the two equal-width buttons (see
+    // the CSS comment on .dialog-bottom for why this needs to be its own
+    // flex row rather than sharing row 1's grid columns).
+    if(lbCount.parentNode !== dialogActionsEl) dialogActionsEl.insertBefore(lbCount, lbNextBtn);
+    // Row 1: title + Download, as direct children of .dialog-bottom itself
+    // (not nested inside .dialog-actions), so Download can take the
+    // "download" grid-area next to the title instead of landing in row 2.
+    if(lbDownload.parentNode !== dialogBottomEl) dialogBottomEl.appendChild(lbDownload);
+  }else{
+    if(lbCount.parentNode !== lbCountDesktopHome){
+      // Put it back before the maximize/close button group, its original spot.
+      lbCountDesktopHome.insertBefore(lbCount, lbCountDesktopHome.firstChild);
+    }
+    if(lbDownload.parentNode !== lbDownloadDesktopHome){
+      lbDownloadDesktopHome.insertBefore(lbDownload, lbDownloadDesktopNextSibling);
+    }
+  }
+}
+relocateLbCountForViewport();
+wpMobileSingleView.addEventListener('change', relocateLbCountForViewport);
+
+// Each tile's width is a percentage of the carousel's own width. The active
+// tile is always 60%. The side the person is currently heading toward (see
+// wpDirection) gets a 30% "on deck" tile right next to it, then every tile
+// after that shrinks to a constant 10% pill, cascading all the way to
+// whichever end of the list is in that direction. The side they came from
+// gets nothing — it's fully offscreen — so the strip always reads as one
+// big tile plus a run of shrinking ones flowing the way they're browsing.
+// Pools of exactly two wallpapers only ever show two tiles: 70% active /
+// 30% the other one, since there's no room for a pill cascade.
+function wpItemFraction(i, activeIndex, poolLen, echoIndex){
   if(poolLen <= 1) return 1;
   if(poolLen === 2) return i === activeIndex ? 0.70 : 0.30;
 
-  const isFirst = activeIndex === 0;
-  const isLast = activeIndex === poolLen - 1;
-
-  if(isFirst){
-    if(i === 0) return 0.60;
-    if(i === 1) return 0.30;
-    if(i === 2) return 0.10;
-    return null;
-  }
-  if(isLast){
-    if(i === poolLen - 1) return 0.60;
-    if(i === poolLen - 2) return 0.30;
-    if(i === poolLen - 3) return 0.10;
-    return null;
-  }
   if(i === activeIndex) return 0.60;
-  if(i === activeIndex - 1) return 0.30;
-  if(i === activeIndex + 1) return 0.10;
-  return null;
+
+  // Which physical side (left/right) is "ahead" depends on wpDirection.
+  // dir === 1 (heading toward the end of the list): ahead = higher indices.
+  // dir === -1 (heading toward the beginning): ahead = lower indices.
+  // If that side has no tiles left (the active tile is sitting flush at
+  // that end of the list already), fall back to the other side instead of
+  // collapsing down to a single lonely tile.
+  let dir = wpDirection === -1 ? -1 : 1;
+  const aheadExists = dir === 1 ? activeIndex < poolLen - 1 : activeIndex > 0;
+  if(!aheadExists) dir = -dir;
+
+  const stepsAhead = (i - activeIndex) * dir;
+
+  if(stepsAhead <= 0){
+    if(stepsAhead === -1){
+      // Resting one step before either true boundary of the list — the 2nd
+      // wallpaper while heading backward, or the 2nd-to-last wallpaper while
+      // heading forward — the tile you just passed keeps its trailing peek
+      // permanently, not just for one frame. That's the one stop on each
+      // end where the "ahead" side (just the 1st/last wallpaper) can't grow
+      // any further and the true boundary is one step away — so the strip
+      // stays populated on both sides here instead of going flat black.
+      // Every other stop, in either direction, doesn't get this treatment.
+      if((dir === -1 && activeIndex === 1) || (dir === 1 && activeIndex === poolLen - 2)) return 0.10;
+      // Otherwise, that trailing tile only lingers for one transitional
+      // frame — right after a direction reversal (or the very first move
+      // after opening the lightbox, which counts as a reversal too — see
+      // wpDirection's initial null in goToIndex/stepLightbox) — then fully
+      // collapses on the next same-direction step.
+      if(echoIndex !== null && i === echoIndex) return 0.10;
+    }
+    return null; // behind the direction of travel: hidden
+  }
+  if(stepsAhead === 1) return 0.30;
+  return 0.10; // every further tile in that direction: a constant pill
 }
 
-function wpItemWidth(i, activeIndex, poolLen, containerW){
-  const frac = wpItemFraction(i, activeIndex, poolLen);
+function wpItemWidth(i, activeIndex, poolLen, containerW, echoIndex){
+  const frac = wpItemFraction(i, activeIndex, poolLen, echoIndex);
   return frac === null ? 0 : Math.round(containerW * frac);
 }
 
 function goToIndex(i){
   const pool = getPool(lightboxPoolMode);
   if(i < 0 || i >= pool.length || i === currentIndex) return;
+  const newDir = i > currentIndex ? 1 : -1;
+  const reversed = wpDirection === null || newDir !== wpDirection;
+  wpEchoIndex = reversed ? currentIndex : null;
+  wpDirection = newDir;
   currentIndex = i;
   renderLightbox(pool);
+  maybeShowChromeOnNavigate();
 }
 
 function buildCarousel(pool){
@@ -3490,7 +4620,7 @@ function layoutCarousel(){
   let x = 0;
   const lefts = [];
   items.forEach((item,i) => {
-    const w = wpItemWidth(i, currentIndex, items.length, containerW);
+    const w = wpItemWidth(i, currentIndex, items.length, containerW, wpEchoIndex);
     const hidden = w === 0;
     item.style.width = w + 'px';
     item.classList.toggle('is-active', i === currentIndex);
@@ -3505,10 +4635,35 @@ function layoutCarousel(){
   const minTranslate = Math.min(0, containerW - trackWidth);
   let translate = containerW / 2 - activeCenter;
   translate = Math.max(minTranslate, Math.min(0, translate));
+  // Below 760px, only the active tile is ever actually visible (CSS hides
+  // the rest — see the mobile "single wallpaper, no carousel peeks" rule) —
+  // so the peek-width math above, sized for a multi-tile strip, no longer
+  // describes what's on screen. The one visible tile already fills the
+  // container on its own; translate just needs to stay put at 0 rather
+  // than shift for peek tiles that aren't actually being drawn.
+  if(wpMobileSingleView.matches) translate = 0;
   wpDragBase = translate;
   if(!wpTrack.classList.contains('is-dragging')){
     wpTrack.style.transform = `translateX(${translate}px)`;
   }
+  // Re-measure which index is active so future layout passes have an
+  // accurate baseline — no per-tile pop/slide animation is added here
+  // anymore; the track's own transform transition is the only motion.
+  wpLastPunchedIndex = currentIndex;
+  positionLbSpinner(translate + activeCenter - containerW / 2);
+}
+
+// The loading spinner is centered across the whole .dialog-media box by
+// default (see .dialog-status), which is the same as the active wallpaper
+// only when the carousel's translate above isn't clamped. At the very first
+// or last wallpaper it *is* clamped — the active tile sits flush against an
+// edge instead of in the middle — so the spinner would visibly sit over the
+// gap/peek tiles rather than the photo that's actually loading. Nudging the
+// spinner by the same clamp amount keeps it centered on the wallpaper itself
+// instead of the popup around it.
+function positionLbSpinner(offsetX){
+  if(!lbSpinner) return;
+  lbSpinner.style.transform = offsetX ? `translateX(${offsetX}px)` : '';
 }
 
 function setActiveImage(item, frame){
@@ -3516,13 +4671,13 @@ function setActiveImage(item, frame){
   const hi = frame.lightboxSrc || makePreviewUrl(frame.src, LIGHTBOX_PREVIEW_WIDTH);
   lbStatus.hidden = false;
   lbStatus.classList.remove('error');
-  lbStatus.textContent = 'Loading…';
+  lbStatusText.textContent = 'Loading…';
   img.onload = () => {
     lbStatus.hidden = true;
   };
   img.onerror = () => {
     lbStatus.classList.add('error');
-    lbStatus.textContent = "Couldn't load this image — try Download instead, or open it directly on GitHub.";
+    lbStatusText.textContent = "Couldn't load this image — try Download instead, or open it directly on GitHub.";
   };
   if(img.src !== hi){
     img.src = hi;
@@ -3534,6 +4689,7 @@ function setActiveImage(item, frame){
 if(wpCarousel){
   wpCarousel.addEventListener('pointerdown', e => {
     if(wpIsTouchNav) return; // phones: buttons only, no swipe-drag
+    if(wpMobileSingleView.matches) return; // no peek tiles to drag between at this width
     if(e.pointerType === 'mouse' && e.button !== 0) return;
     wpDragging = true;
     wpDragMoved = false;
@@ -3541,6 +4697,20 @@ if(wpCarousel){
     wpTrack.classList.add('is-dragging');
     wpCarousel.classList.add('is-dragging');
     wpCarousel.setPointerCapture(e.pointerId);
+
+    // Compute the rubber-band bound once per drag rather than on every
+    // pointermove: currentIndex/wpEchoIndex (the only inputs to item width)
+    // don't change mid-drag, so re-walking every tile and re-reading
+    // clientWidth on each move was repeated work for the same answer.
+    const items = Array.from(wpTrack.children);
+    const containerW = wpCarousel.clientWidth;
+    let x = 0;
+    items.forEach((item,i) => {
+      const w = wpItemWidth(i, currentIndex, items.length, containerW, wpEchoIndex);
+      x += w + (w === 0 ? 0 : WP_GAP);
+    });
+    const trackWidth = x - WP_GAP;
+    wpDragMinT = Math.min(0, containerW - trackWidth);
   });
   wpCarousel.addEventListener('pointermove', e => {
     if(!wpDragging) return;
@@ -3549,15 +4719,7 @@ if(wpCarousel){
     let next = wpDragBase + dx;
     // Rubber-band resistance once dragging past either end of the strip —
     // the bounce-back on release is what sells the Pixel-carousel feel.
-    const items = Array.from(wpTrack.children);
-    const containerW = wpCarousel.clientWidth;
-    let x = 0;
-    items.forEach((item,i) => {
-      const w = wpItemWidth(i, currentIndex, items.length, containerW);
-      x += w + (w === 0 ? 0 : WP_GAP);
-    });
-    const trackWidth = x - WP_GAP;
-    const minT = Math.min(0, containerW - trackWidth);
+    const minT = wpDragMinT;
     const maxT = 0;
     if(next > maxT) next = maxT + (next - maxT) * 0.35;
     if(next < minT) next = minT + (next - minT) * 0.35;
@@ -3581,45 +4743,179 @@ if(wpCarousel){
   window.addEventListener('resize', () => { if(!lightbox.hidden) layoutCarousel(); });
 }
 
-function renderLightbox(pool){
+// Tracks the most recent renderLightbox() call so that when Next/Prev is
+// clicked rapidly, the expensive parts (decoding a full-size image,
+// preloading neighbors) only actually run for wherever the user finally
+// lands — not for every intermediate frame they blew past on the way
+// there. The cheap parts (title, counter, carousel position) still update
+// on every single click so navigation still feels instant either way.
+let lightboxRenderGen = 0;
+
+function renderLightbox(pool, immediate=false){
   const items = buildCarousel(pool);
   const el = pool[currentIndex];
   const frame = frameData[el.dataset.id];
+  const gen = ++lightboxRenderGen;
 
-  lbTitle.textContent = frame.title;
+  setLightboxTitle(frame);
 
+  // Restart the count-pop animation without forcing a synchronous layout
+  // flush (the old `void lbCount.offsetWidth` trick reflows immediately,
+  // right on the click handler's stack — costly if it's firing on every
+  // click of a fast double-click). A double rAF restarts the animation on
+  // the browser's own paint schedule instead.
   lbCount.classList.remove('expressive-count');
-  void lbCount.offsetWidth;
-  lbCount.classList.add('expressive-count');
   lbCount.textContent = `${currentIndex+1} / ${pool.length}`;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if(gen === lightboxRenderGen) lbCount.classList.add('expressive-count');
+    });
+  });
 
-  // Let the currently viewed wallpaper become the ambient backdrop.
-  const ambient = document.getElementById('ambientBg');
-  if(ambient){
-    const ambientSrc = frame.previewSrc || makePreviewUrl(frame.src, CARD_PREVIEW_WIDTH);
-    ambient.style.backgroundImage = `url("${ambientSrc}")`;
-  }
-
-  setActiveImage(items[currentIndex], frame);
   layoutCarousel();
 
-  // Preload neighbors' full-size previews so stepping the carousel feels instant.
-  [currentIndex - 1, currentIndex + 1].forEach(i => {
-    if(i < 0 || i >= pool.length) return;
-    const nextFrame = frameData[pool[i].dataset.id];
-    if(nextFrame){
-      const preload = new Image();
-      preload.decoding = 'async';
-      preload.src = nextFrame.lightboxSrc || makePreviewUrl(nextFrame.src, LIGHTBOX_PREVIEW_WIDTH);
+  // Debounce the heavy work: full-size image decode + neighbor preloads.
+  // If another step comes in before this fires, this one is dropped —
+  // so spamming Next/Prev doesn't pile up concurrent large-image decodes
+  // for frames already scrolled past. Skipped on the very first open so
+  // that case still starts loading immediately.
+  //
+  // Timed to land after the tile's width transition finishes (WP_RESIZE_MS),
+  // not partway through it. Swapping to the full-res image mid-resize meant
+  // the browser was decoding/repainting a large image at a constantly
+  // changing box size on top of the resize's own reflow cost, every frame —
+  // that stacked cost was the other big source of jank alongside the width
+  // transition itself. The tile now just shows its small preview (already
+  // loaded, cheap to rescale) until it's done moving, then upgrades to sharp.
+  const runHeavyWork = () => {
+    if(gen !== lightboxRenderGen) return;
+
+    const ambient = document.getElementById('ambientBg');
+    if(ambient){
+      const ambientSrc = frame.previewSrc || makePreviewUrl(frame.src, CARD_PREVIEW_WIDTH);
+      ambient.style.backgroundImage = `url("${ambientSrc}")`;
     }
-  });
+
+    setActiveImage(items[currentIndex], frame);
+
+    // Preload neighbors' full-size previews so stepping the carousel feels instant.
+    [currentIndex - 1, currentIndex + 1].forEach(i => {
+      if(i < 0 || i >= pool.length) return;
+      const nextFrame = frameData[pool[i].dataset.id];
+      if(nextFrame){
+        const preload = new Image();
+        preload.decoding = 'async';
+        preload.src = nextFrame.lightboxSrc || makePreviewUrl(nextFrame.src, LIGHTBOX_PREVIEW_WIDTH);
+      }
+    });
+  };
+  if(immediate) runHeavyWork();
+  else setTimeout(runHeavyWork, WP_RESIZE_MS + 40);
 
   lbDownload.onclick = ()=> downloadFrame(frame);
 }
 function closeLightbox(){
   lightbox.hidden = true;
   document.body.style.overflow = '';
+  setMaximized(false);
+  clearTimeout(chromeHideTimer);
+  const dialog = dialogEl;
+  dialog.classList.remove('chrome-hidden');
+  dialog.style.transform = '';
+  dialog.style.opacity = '';
 }
+function setMaximized(on){
+  const dialog = dialogEl;
+  dialog.classList.toggle('is-maximized', on);
+  lbMaximize.setAttribute('aria-pressed', on ? 'true' : 'false');
+  lbMaximize.setAttribute('aria-label', on ? 'Restore' : 'Maximize');
+  // The carousel sizes itself off the container's current pixel width, so
+  // it needs to re-measure once the resize transition below has settled.
+  requestAnimationFrame(() => setTimeout(layoutCarousel, 420));
+  if(on && wpIsTouchNav){
+    showChrome(); // starts the auto-hide timer for the fullscreen overlay bars
+  } else {
+    clearTimeout(chromeHideTimer);
+    dialog.classList.remove('chrome-hidden');
+  }
+}
+
+/* ---------- Mobile fullscreen maximize: auto-hiding chrome + swipe-to-close ----------
+   Only active on touch devices while maximized — desktop's maximize stays a
+   plain enlarged modal with its bars always visible, so none of this runs
+   there. The photo fills the whole screen and the title/count/action bars
+   float on top; they fade out on their own after a few seconds, a tap
+   brings them back, and swiping down anywhere on the photo closes the
+   viewer (handy since the close button is hidden most of the time). */
+let chromeHideTimer = null;
+function scheduleChromeHide(){
+  clearTimeout(chromeHideTimer);
+  chromeHideTimer = setTimeout(() => {
+    dialogEl?.classList.add('chrome-hidden');
+  }, 2800);
+}
+function showChrome(){
+  dialogEl?.classList.remove('chrome-hidden');
+  scheduleChromeHide();
+}
+// Called after any navigation so the bars reappear if the person was mid-
+// browse with them faded out — jumping to a new wallpaper with no visible
+// title or counter would be disorienting.
+function maybeShowChromeOnNavigate(){
+  const dialog = dialogEl;
+  if(dialog && dialog.classList.contains('is-maximized') && wpIsTouchNav) showChrome();
+}
+
+const dialogMediaEl = document.querySelector('.dialog-media');
+// Cached once: this element never changes, so re-running querySelector('.dialog')
+// repeatedly (including on every pointermove of a drag) was wasted DOM
+// lookup work on handlers that already fire many times per second.
+const dialogEl = document.querySelector('.dialog');
+let swipeStartX = 0, swipeStartY = 0, swipeDragging = false, swipeMoved = false;
+if(dialogMediaEl){
+  dialogMediaEl.addEventListener('pointerdown', e => {
+    if(!wpIsTouchNav || !dialogEl.classList.contains('is-maximized')) return;
+    swipeDragging = true;
+    swipeMoved = false;
+    swipeStartX = e.clientX;
+    swipeStartY = e.clientY;
+  });
+  dialogMediaEl.addEventListener('pointermove', e => {
+    if(!swipeDragging) return;
+    const dx = e.clientX - swipeStartX;
+    const dy = e.clientY - swipeStartY;
+    if(Math.abs(dy) > 6 || Math.abs(dx) > 6) swipeMoved = true;
+    // Only a mostly-vertical, downward drag counts as swipe-to-close — a
+    // mostly-horizontal one is the carousel's own swipe-to-navigate area.
+    if(dy > 0 && Math.abs(dy) > Math.abs(dx)){
+      dialogEl.classList.add('chrome-hidden');
+      dialogEl.style.transform = `translateY(${dy}px)`;
+      dialogEl.style.opacity = String(Math.max(.4, 1 - dy / 600));
+    }
+  });
+  const endSwipe = e => {
+    if(!swipeDragging) return;
+    swipeDragging = false;
+    const dialog = dialogEl;
+    const dy = (e.clientY ?? swipeStartY) - swipeStartY;
+    const dx = (e.clientX ?? swipeStartX) - swipeStartX;
+    dialog.style.transform = '';
+    dialog.style.opacity = '';
+    if(dy > 110 && Math.abs(dy) > Math.abs(dx)){
+      closeLightbox();
+    } else if(!swipeMoved){
+      // A tap rather than a drag: toggle the overlay bars.
+      if(dialog.classList.contains('chrome-hidden')) showChrome();
+      else { dialog.classList.add('chrome-hidden'); clearTimeout(chromeHideTimer); }
+    } else if(!dialog.classList.contains('chrome-hidden')){
+      scheduleChromeHide();
+    }
+    setTimeout(() => { swipeMoved = false; }, 30);
+  };
+  dialogMediaEl.addEventListener('pointerup', endSwipe);
+  dialogMediaEl.addEventListener('pointercancel', endSwipe);
+}
+
 function stepLightbox(delta){
   const pool = getPool(lightboxPoolMode);
   if(!pool.length) return;
@@ -3627,10 +4923,19 @@ function stepLightbox(delta){
   // edge-flush layout only reads correctly if navigation actually stops there.
   const next = Math.max(0, Math.min(pool.length - 1, currentIndex + delta));
   if(next === currentIndex) return;
+  const newDir = delta > 0 ? 1 : -1;
+  const reversed = wpDirection === null || newDir !== wpDirection;
+  wpEchoIndex = reversed ? currentIndex : null;
+  wpDirection = newDir;
   currentIndex = next;
   renderLightbox(pool);
+  maybeShowChromeOnNavigate();
 }
 document.getElementById('lbClose').addEventListener('click', closeLightbox);
+const lbMaximize = document.getElementById('lbMaximize');
+lbMaximize.addEventListener('click', () => {
+  setMaximized(lbMaximize.getAttribute('aria-pressed') !== 'true');
+});
 document.getElementById('lbPrev').addEventListener('click', ()=>stepLightbox(-1));
 document.getElementById('lbNext').addEventListener('click', ()=>stepLightbox(1));
 lightbox.addEventListener('click', e=>{ if(e.target === lightbox) closeLightbox(); });
@@ -3645,33 +4950,22 @@ document.addEventListener('keydown', e=>{
 
 const wallpaperBlobCache = new Map();
 
-async function preloadWallpaperDownloads(){
-  if (!Array.isArray(frames)) return;
-
-  frames.slice(0, 12).forEach(async (frame)=>{
-    try{
-      const res = await fetch(frame.src, {cache:'force-cache'});
-      const blob = await res.blob();
-      wallpaperBlobCache.set(frame.src, blob);
-    }catch(e){}
-  });
-}
-
 async function downloadFrame(frame){
+  let waitingMessage, waitingInterval;
   try{
     showExpressiveSnackbar(
       'Preparing download...',
       'Large wallpapers may take a few seconds. Please wait.'
     );
 
-    const waitingMessage = setTimeout(() => {
+    waitingMessage = setTimeout(() => {
       showExpressiveSnackbar(
         'Still working...',
         'Large wallpaper files can take a little longer. Please wait.'
       );
     }, 2500);
 
-    const waitingInterval = setInterval(() => {
+    waitingInterval = setInterval(() => {
       showExpressiveSnackbar(
         'Still downloading...',
         'Please keep this page open until the download starts.'
@@ -3703,9 +4997,96 @@ async function downloadFrame(frame){
     clearInterval(waitingInterval);
 
     showExpressiveSnackbar('Downloaded!', frame.filename);
+    showDownloadSuccess();
+    playDownloadSound();
   }catch(err){
+    clearTimeout(waitingMessage);
+    clearInterval(waitingInterval);
     showExpressiveSnackbar('Download failed', frame.filename);
   }
+}
+
+let downloadSuccessTimer = null;
+function showDownloadSuccess(){
+  const label = lbDownload.querySelector('.lb-download-label');
+  const previousLabel = label.textContent;
+  clearTimeout(downloadSuccessTimer);
+  lbDownload.classList.remove('is-success');
+  void lbDownload.offsetWidth; // restart the pop animation if triggered twice in a row
+  lbDownload.classList.add('is-success');
+  label.textContent = 'Downloaded!';
+  downloadSuccessTimer = setTimeout(() => {
+    lbDownload.classList.remove('is-success');
+    label.textContent = previousLabel === 'Downloaded!' ? 'Download' : previousLabel;
+  }, 1800);
+  fireConfetti(lbDownload);
+}
+
+/* ---------- Confetti burst ----------
+   Launched from the Download button on a successful save. Colors are pulled
+   from the current color-filter theme (plus a couple of fixed accents) so
+   the burst always matches whatever palette is active, the same way the
+   surprise-me glow does. Each piece is animated independently via the Web
+   Animations API rather than appended to a shared timeline, so overlapping
+   bursts (rapid repeat downloads) never fight each other, and every piece
+   cleans itself up on its own 'finish' event instead of relying on a
+   shared timer. Respects prefers-reduced-motion via the CSS rule above,
+   which hides .confetti-piece outright — the JS still runs but produces
+   no visible motion, so no extra branching is needed here. */
+const CONFETTI_COLORS = ['#e0483e','#e08a3e','#e0c93e','#6cbf5c','#4c7fe0','#8a5ce0'];
+function confettiPalette(){
+  const root = getComputedStyle(document.documentElement);
+  const themed = [
+    root.getPropertyValue('--md-primary').trim(),
+    root.getPropertyValue('--md-secondary').trim(),
+    root.getPropertyValue('--md-tertiary').trim(),
+  ].filter(Boolean);
+  return themed.length ? themed.concat(CONFETTI_COLORS) : CONFETTI_COLORS;
+}
+function fireConfetti(originEl, count=26){
+  if(!originEl || !('animate' in Element.prototype)) return;
+  const rect = originEl.getBoundingClientRect();
+  const originX = rect.left + rect.width / 2;
+  const originY = rect.top + rect.height / 2;
+  const palette = confettiPalette();
+  const frag = document.createDocumentFragment();
+  const pieces = [];
+  for(let i=0; i<count; i++){
+    const piece = document.createElement('span');
+    piece.className = 'confetti-piece' + (Math.random() < 0.5 ? ' is-round' : '');
+    piece.style.background = palette[Math.floor(Math.random()*palette.length)];
+    const w = 5 + Math.random()*5;
+    piece.style.width = `${w}px`;
+    piece.style.height = `${(4 + Math.random()*5)}px`;
+    frag.appendChild(piece);
+    pieces.push(piece);
+  }
+  document.body.appendChild(frag);
+  pieces.forEach(piece=>{
+    // Launch mostly upward/outward in a wide arc above the button, then
+    // fall and fade — a small burst rather than a full-screen shower.
+    const angle = (Math.random()*Math.PI) + Math.PI; // upper half circle
+    const distance = 60 + Math.random()*90;
+    const dx = Math.cos(angle) * distance;
+    const dy = Math.sin(angle) * distance;
+    const fallDistance = 70 + Math.random()*60;
+    const spin = (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random()*360);
+    const duration = 700 + Math.random()*450;
+
+    const anim = piece.animate([
+      { transform:`translate(${originX}px, ${originY}px) rotate(0deg)`, opacity:1 },
+      { transform:`translate(${originX+dx}px, ${originY+dy}px) rotate(${spin*0.4}deg)`, opacity:1, offset:0.45 },
+      { transform:`translate(${originX+dx*1.15}px, ${originY+dy+fallDistance}px) rotate(${spin}deg)`, opacity:0 }
+    ], {
+      duration,
+      easing:'cubic-bezier(.2,.7,.3,1)',
+      fill:'forwards'
+    });
+    anim.onfinish = () => piece.remove();
+    // Belt-and-suspenders cleanup in case 'finish' never fires (e.g. the
+    // tab was backgrounded mid-animation).
+    setTimeout(() => piece.remove(), duration + 200);
+  });
 }
 
 /* ---------- Responsive header behavior ---------- */
@@ -3778,8 +5159,14 @@ window.addEventListener('scroll', ()=>{
 window.addEventListener('resize', ()=>{
   // Re-evaluate the complete header/filter layout after a resize so switching
   // between desktop, tablet and mobile breakpoints never leaves the filter
-  // in the wrong container.
-  updateHeaderOnScroll();
+  // in the wrong container. Coalesced onto the same rAF-guarded flag as the
+  // scroll handler above, since a window drag-resize can fire this event
+  // many times per frame and the work here includes a getBoundingClientRect
+  // read plus DOM moves.
+  if(!headerTicking){
+    headerTicking = true;
+    requestAnimationFrame(updateHeaderOnScroll);
+  }
 },{passive:true});
 
 mobileTopBtn.addEventListener('click', ()=>{
@@ -3974,12 +5361,16 @@ updateHeaderOnScroll();
   if(colorTrack){
     colorTrack.addEventListener('click', () => {
       requestAnimationFrame(() => {
-        document.querySelectorAll('#grid .card:not(.filter-hidden)').forEach((card, i) => {
+        // One forced reflow for the whole batch instead of one per card
+        // (the previous version read offsetWidth inside the per-card loop,
+        // forcing a synchronous layout on every iteration).
+        const cards = document.querySelectorAll('#grid .card:not(.filter-hidden)');
+        cards.forEach((card, i) => {
           card.classList.remove('is-color-enter');
           card.style.animationDelay = `${Math.min(i, 7) * 18}ms`;
-          void card.offsetWidth;
-          card.classList.add('is-color-enter');
         });
+        void grid.offsetWidth;
+        cards.forEach(card => card.classList.add('is-color-enter'));
       });
     });
   }
@@ -4010,6 +5401,7 @@ updateHeaderOnScroll();
   const prev = document.getElementById('lbPrev');
   const next = document.getElementById('lbNext');
   const actionButtons = [prev, next].filter(Boolean);
+  const lbSpinner = document.querySelector('#lbStatus .lb-spinner');
 
   if(!media || !actionButtons.length) return;
 
@@ -4249,13 +5641,17 @@ const applyOfficialShape = (button, morph=false) => {
     setOfficialShape(button,nextShape);
     return;
   }
-  button.classList.remove('morphing');
-  void button.offsetWidth;
-  button.classList.add('morphing');
+  // No classList('morphing')/forced-reflow dance here anymore: the
+  // ".official-shape.morphing" rule that dance existed to restart was fully
+  // neutralized (animation:none/transition:none !important) by the later
+  // "Smooth morph only" CSS block, so the class has had zero visual effect
+  // for a while now — the actual morph is 100% driven by the path-point
+  // interpolation in morphOfficialShape() below. Restarting a dead animation
+  // isn't free: `void button.offsetWidth` forces a synchronous layout flush,
+  // and that was firing on *every* Next/Prev click before this animation
+  // even started. That's what made shape changes feel rigid/stuttery.
   morphOfficialShape(button,current,nextShape,350);
   button.dataset.shape=nextShape;
-  clearTimeout(button._shapeTimer);
-  button._shapeTimer=setTimeout(()=>button.classList.remove('morphing'),370);
 };
 
 const animateNavigation = (button, direction) => {
@@ -4265,8 +5661,21 @@ const animateNavigation = (button, direction) => {
       void dialogTop.offsetWidth;
       dialogTop.classList.add('expressive-update');
     }
+    // #lbCount moves between .dialog-top (desktop) and .dialog-bottom
+    // (mobile) depending on viewport — see relocateLbCountForViewport in
+    // the main script — so its "pop" animation is triggered directly here
+    // instead of solely through the .dialog-top.expressive-update ancestor
+    // selector above, which only still reaches it on desktop.
+    lbCount.classList.remove('expressive-update-count');
+    void lbCount.offsetWidth;
+    lbCount.classList.add('expressive-update-count');
 
     applyOfficialShape(button, true);
+    // Morph the loading spinner's silhouette in lockstep with the nav
+    // button that was pressed, so it's already mid-transition (or ready
+    // with a fresh shape) whenever the next wallpaper turns out slow to
+    // load — same spring, same shape family, just spinning in place.
+    if(lbSpinner) applyOfficialShape(lbSpinner, true);
 
     // Rotation belongs to the SVG silhouette, not the button container.
     // This lets each Material shape enter with its own orientation while the
@@ -4277,6 +5686,7 @@ const animateNavigation = (button, direction) => {
     clearTimeout(motionTimer);
     motionTimer = setTimeout(() => {
       dialogTop?.classList.remove('expressive-update');
+      lbCount.classList.remove('expressive-update-count');
       button.classList.remove('expressive-press');
     }, 520);
   };
@@ -4301,6 +5711,7 @@ const animateNavigation = (button, direction) => {
 
 
   actionButtons.forEach(applyOfficialShape);
+  if(lbSpinner) setOfficialShape(lbSpinner, getRandomShape(''));
 
   // Pre-parse every silhouette into its cached 96-point outline while the
   // browser is idle, so the first time navigation reaches a shape it hasn't
