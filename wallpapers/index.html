@@ -1161,8 +1161,8 @@
     top:0;
     left:0;
     z-index:2147483000;
-    max-width:320px;
-    max-height:320px;
+    max-width:min(46vw,520px);
+    max-height:min(46vw,520px);
     border-radius:16px;
     overflow:hidden;
     box-shadow:0 12px 32px rgba(0,0,0,.35),0 2px 8px rgba(0,0,0,.25);
@@ -1183,15 +1183,13 @@
     height:100%;
     object-fit:contain;
   }
-  .card-preview-float.is-touch{
-    max-width:min(78vw,420px);
-    max-height:min(60vh,420px);
-  }
   @media (prefers-reduced-motion:reduce){
     .card-preview-float{transition:opacity .01s linear}
   }
-  @media (hover:none){
-    .card-preview-float:not(.is-touch){display:none}
+  /* Desktop-hover-only feature: devices without a fine hover pointer
+     (touch/mobile) never get this floating preview at all. */
+  @media (hover:none),(pointer:coarse){
+    .card-preview-float{display:none}
   }
 
   /* ---------- Cursor trail ----------
@@ -3831,16 +3829,13 @@ function buildNewBadge(){
   return badge;
 }
 
-/* ---------- Card hover/long-press preview ----------
- * Desktop: hovering a card for a moment shows a floating preview of the
- * full, uncropped image near the cursor (the grid tile itself is cropped
- * to a square/rectangle via object-fit:cover, so this is the only way to
- * see the whole shot without opening it). Touch: a long-press shows the
- * same preview centered on screen; releasing dismisses it without
- * navigating, while a normal short tap still opens the lightbox exactly
- * as before. Both paths share one floating element and one suppression
- * flag so the click handler can tell "long-press just happened" apart
- * from "this was a real tap".
+/* ---------- Card hover preview ----------
+ * Desktop only: hovering a card for a moment shows a floating preview of
+ * the full, uncropped image near the cursor (the grid tile itself is
+ * cropped to a square/rectangle via object-fit:cover, so this is the only
+ * way to see the whole shot without opening it). Touch devices don't get
+ * this at all - a tap just opens the lightbox directly, so there's no
+ * long-press step to learn or accidentally trigger while scrolling.
  */
 const cardPreviewEl = document.createElement('div');
 cardPreviewEl.className = 'card-preview-float';
@@ -3853,8 +3848,6 @@ document.body.appendChild(cardPreviewEl);
 const supportsHoverPreview = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
 let hoverPreviewTimer = null;
 let hoverPreviewCard = null;
-let longPressTimer = null;
-let longPressActive = false;
 let suppressNextCardClick = false;
 
 function positionCardPreview(x, y){
@@ -3874,90 +3867,43 @@ function positionCardPreview(x, y){
     ? `translate(${left}px, ${top}px) scale(1)`
     : `translate(${left}px, ${top}px) scale(.94)`;
 }
-function showCardPreview(frame, x, y, touch=false){
+function showCardPreview(frame, x, y){
   if(!frame) return;
   cardPreviewImg.src = frame.previewSrc || frame.src;
   cardPreviewImg.alt = frame.title || '';
-  cardPreviewEl.classList.toggle('is-touch', touch);
-  if(touch){
-    cardPreviewEl.style.left = '50%';
-    cardPreviewEl.style.top = '50%';
-    cardPreviewEl.style.transform = 'translate(-50%,-50%) scale(.94)';
-    requestAnimationFrame(()=>{
-      cardPreviewEl.classList.add('is-visible');
-      cardPreviewEl.style.transform = 'translate(-50%,-50%) scale(1)';
-    });
-  }else{
-    cardPreviewEl.style.left = '0';
-    cardPreviewEl.style.top = '0';
+  cardPreviewEl.style.left = '0';
+  cardPreviewEl.style.top = '0';
+  positionCardPreview(x, y);
+  requestAnimationFrame(()=>{
+    cardPreviewEl.classList.add('is-visible');
     positionCardPreview(x, y);
-    requestAnimationFrame(()=>{
-      cardPreviewEl.classList.add('is-visible');
-      positionCardPreview(x, y);
-    });
-  }
+  });
 }
 function hideCardPreview(){
   cardPreviewEl.classList.remove('is-visible');
   hoverPreviewCard = null;
 }
 
-// Attaches the hover/long-press preview behavior to one card. Shared by
-// both buildCard and buildNewSectionCard so the two grids behave the same.
+// Attaches the hover preview behavior to one card. Shared by both
+// buildCard and buildNewSectionCard so the two grids behave the same.
 function wireCardPreview(card, frame){
-  if(supportsHoverPreview){
-    card.addEventListener('pointerenter', e => {
-      if(e.pointerType !== 'mouse') return;
-      clearTimeout(hoverPreviewTimer);
-      hoverPreviewTimer = setTimeout(()=>{
-        hoverPreviewCard = card;
-        showCardPreview(frame, e.clientX, e.clientY, false);
-      }, 450);
-    });
-    card.addEventListener('pointermove', e => {
-      if(e.pointerType !== 'mouse') return;
-      if(hoverPreviewCard === card) positionCardPreview(e.clientX, e.clientY);
-    });
-    card.addEventListener('pointerleave', () => {
-      clearTimeout(hoverPreviewTimer);
-      if(hoverPreviewCard === card) hideCardPreview();
-    });
-  }
-
-  // Touch long-press: a hold with (almost) no movement shows the preview;
-  // releasing after that dismisses it and suppresses the click that would
-  // otherwise follow, so a long-press never also opens the lightbox.
-  let startX = 0, startY = 0, moved = false;
-  card.addEventListener('pointerdown', e => {
-    if(e.pointerType === 'mouse') return;
-    startX = e.clientX; startY = e.clientY;
-    moved = false;
-    longPressActive = false;
-    clearTimeout(longPressTimer);
-    longPressTimer = setTimeout(()=>{
-      if(moved) return;
-      longPressActive = true;
-      showCardPreview(frame, e.clientX, e.clientY, true);
-    }, 480);
+  if(!supportsHoverPreview) return;
+  card.addEventListener('pointerenter', e => {
+    if(e.pointerType !== 'mouse') return;
+    clearTimeout(hoverPreviewTimer);
+    hoverPreviewTimer = setTimeout(()=>{
+      hoverPreviewCard = card;
+      showCardPreview(frame, e.clientX, e.clientY);
+    }, 450);
   });
   card.addEventListener('pointermove', e => {
-    if(e.pointerType === 'mouse') return;
-    if(Math.abs(e.clientX-startX) > 10 || Math.abs(e.clientY-startY) > 10){
-      moved = true;
-      clearTimeout(longPressTimer);
-    }
+    if(e.pointerType !== 'mouse') return;
+    if(hoverPreviewCard === card) positionCardPreview(e.clientX, e.clientY);
   });
-  const endLongPress = e => {
-    if(e && e.pointerType === 'mouse') return;
-    clearTimeout(longPressTimer);
-    if(longPressActive){
-      hideCardPreview();
-      suppressNextCardClick = true;
-    }
-    longPressActive = false;
-  };
-  card.addEventListener('pointerup', endLongPress);
-  card.addEventListener('pointercancel', endLongPress);
+  card.addEventListener('pointerleave', () => {
+    clearTimeout(hoverPreviewTimer);
+    if(hoverPreviewCard === card) hideCardPreview();
+  });
 }
 
 /* ---------- Cursor trail ----------
