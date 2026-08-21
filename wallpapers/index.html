@@ -5550,6 +5550,15 @@ const headerPlaceholder = document.getElementById('headerPlaceholder');
 const mobileTopBtn = document.getElementById('mobileTopBtn');
 const colorFilter = document.getElementById('colorFilter');
 const colorFilterHome = colorFilter.parentNode;
+// Its original next sibling (the New Wallpapers section) - captured once,
+// up front, so moveFilterBack() can restore the filter chips to exactly
+// where they started. This used to hardcode "insert right before #grid"
+// instead, which skipped past the New Wallpapers section - harmless while
+// that section is empty/hidden, but the moment it has real content, a
+// single scroll-down-then-up cycle would silently leave the filter chips
+// stranded below it instead of back at the top, reading as "the filters
+// are just gone" since nobody's looking for them down there.
+const colorFilterAnchor = colorFilter.nextSibling;
 const mobileLayout = window.matchMedia('(max-width: 640px)');
 let lastScrollY = window.scrollY;
 let headerTicking = false;
@@ -5559,7 +5568,7 @@ function moveFilterIntoHeader(){
 }
 function moveFilterBack(){
   if(colorFilter.parentNode !== colorFilterHome){
-    colorFilterHome.insertBefore(colorFilter, document.getElementById('grid'));
+    colorFilterHome.insertBefore(colorFilter, colorFilterAnchor);
   }
 }
 
