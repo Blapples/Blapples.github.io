@@ -3538,17 +3538,24 @@ async function applyGitHistoryNewFlags(frames){
   });
 
   const knownFilenames = new Set(frames.map(f => f.filename).filter(Boolean));
-  const hadNewDates = Object.keys(added).length > 0;
   mergeConfirmedDates(added, knownFilenames);
 
-  if(hadNewDates){
-    const sorted = sortFramesByRecency(frames);
-    sorted.forEach(frame => { if(frame._card) grid.appendChild(frame._card); });
-  }
+  // Always resort using the latest known dates (baseline + anything just
+  // learned), and reorder the main grid's existing cards to match - not
+  // just when this particular call learned brand-new dates, since a
+  // second browser tab, a previous session, or the baked-in baseline can
+  // all mean there's a more up-to-date order available than whatever the
+  // page happened to render first.
+  const sorted = sortFramesByRecency(frames);
+  sorted.forEach(frame => { if(frame._card) grid.appendChild(frame._card); });
 
   if(!changed) return;
-  renderNewSection(frames);
-  frames.forEach(frame=>{
+  // Bug fix: this used to pass the original, un-resorted `frames` here,
+  // so the New Wallpapers section kept whatever order it first rendered
+  // in even after the main grid above was correctly reordered - pass the
+  // same `sorted` list so the two never drift out of sync with each other.
+  renderNewSection(sorted);
+  sorted.forEach(frame=>{
     if(frame._card){
       syncNewBadge(frame._card, frame);
       applyColorFilterToCard(frame._card);
