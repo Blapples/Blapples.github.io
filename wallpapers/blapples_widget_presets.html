@@ -2850,9 +2850,14 @@ async function fetchPresetsFromGitHub(src){
   const {user, repo, path, branch} = src;
   // The recursive git-trees endpoint returns the whole folder tree in one
   // call, so adding more presets never costs extra API requests (GitHub's
-  // unauthenticated API is capped at 60 requests/hour).
+  // unauthenticated API is capped at 60 requests/hour per visitor IP).
   const treeUrl = `https://api.github.com/repos/${user}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
   const res = await fetch(treeUrl, { headers:{ Accept:'application/vnd.github+json' } });
+  if(res.status === 403 || res.status === 429){
+    const err = new Error('GitHub API rate limit reached');
+    err.isRateLimit = true;
+    throw err;
+  }
   if(!res.ok) throw new Error(`GitHub API responded ${res.status}`);
   const data = await res.json();
   if(!Array.isArray(data.tree)) throw new Error('Unexpected GitHub tree response');
@@ -3134,23 +3139,74 @@ function buildPresetCard(preset){
   return card;
 }
 
+// Same idea as the wallpaper page's own cache: keep the last successful
+// fetch in localStorage so a rate-limited or offline visit still shows
+// something instead of an empty "no presets" state.
+const PRESETS_CACHE_KEY = 'blapples-widget-presets-cache-v1';
+
+function readPresetsCache(){
+  try{
+    const raw = localStorage.getItem(PRESETS_CACHE_KEY);
+    if(!raw) return null;
+    const data = JSON.parse(raw);
+    return Array.isArray(data.presets) && data.presets.length ? data.presets : null;
+  }catch(err){
+    return null;
+  }
+}
+
+function writePresetsCache(presets){
+  try{
+    localStorage.setItem(PRESETS_CACHE_KEY, JSON.stringify({ presets, fetchedAt: Date.now() }));
+  }catch(err){
+    // Storage can be unavailable in private/file contexts — presets still
+    // work without it, just without the offline/rate-limit fallback.
+  }
+}
+
+function renderPresetsGrid(presets){
+  const presetsGrid = document.getElementById('presetsGrid');
+  presetsGrid.innerHTML = '';
+  presets.forEach(preset => presetsGrid.appendChild(buildPresetCard(preset)));
+}
+
 async function initPresets(){
   const loading = document.getElementById('presetsLoading');
   const empty = document.getElementById('presetsEmpty');
-  const presetsGrid = document.getElementById('presetsGrid');
-  let presets = [];
+
+  const cached = readPresetsCache();
+  if(cached){
+    loading.hidden = true;
+    renderPresetsGrid(cached);
+  }
+
+  let presets = null;
+  let rateLimited = false;
   try{
     presets = await fetchPresetsFromGitHub(PRESETS_SOURCE);
   }catch(err){
+    rateLimited = !!err.isRateLimit;
     console.warn('Could not load presets from GitHub:', err.message);
   }
+
   loading.hidden = true;
-  if(!presets.length){
-    empty.hidden = false;
+
+  if(presets && presets.length){
+    writePresetsCache(presets);
+    renderPresetsGrid(presets);
+    empty.hidden = true;
     return;
   }
-  presetsGrid.innerHTML = '';
-  presets.forEach(preset => presetsGrid.appendChild(buildPresetCard(preset)));
+
+  // Live fetch failed or came back empty — if we already showed cached
+  // presets above, leave them up rather than replacing them with an
+  // empty state.
+  if(cached) return;
+
+  empty.hidden = false;
+  empty.textContent = rateLimited
+    ? "GitHub's API rate limit was hit just now — refresh again in a bit and this should load."
+    : 'No presets up yet — check back soon.';
 }
 initPresets();
 </script>
