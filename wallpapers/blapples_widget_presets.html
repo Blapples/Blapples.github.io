@@ -2748,7 +2748,7 @@
         Widget presets
       </span>
       <div class="topbar-toggles">
-        <a class="icon-btn back-link" href="blapples_wallpaper_collection.html" aria-label="Back to the wallpaper collection">
+        <a class="icon-btn back-link" href="index.html" aria-label="Back to the wallpaper collection">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
           <span>Wallpapers</span>
         </a>
@@ -3101,7 +3101,7 @@ function buildPresetCard(preset){
       // opens this exact wallpaper via the ?wallpaper= query param.
       const thumbLink = document.createElement('a');
       thumbLink.className = 'preset-linked-thumb';
-      thumbLink.href = `blapples_wallpaper_collection.html?wallpaper=${encodeURIComponent(filename)}`;
+      thumbLink.href = `index.html?wallpaper=${encodeURIComponent(filename)}`;
       thumbLink.target = '_blank';
       thumbLink.rel = 'noopener';
       thumbLink.setAttribute('aria-label', `Open ${filename} in the wallpaper collection`);
