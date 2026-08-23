@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://api.github.com">
 <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     /* Material Expressive-inspired olive / sage palette from the reference */
@@ -2929,6 +2930,16 @@ async function fetchPresetsFromGitHub(src){
   return presets.filter(Boolean).sort((a, b) => a.title.localeCompare(b.title));
 }
 
+function slugify(str){
+  return (str || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'preset';
+}
+
+// Full-resolution wallpaper file (not the resized preview) for bundling
+// into the zip — same file the wallpaper page's Download button uses.
+function fullWallpaperUrl(filename){
+  return rawWallpaperUrl(filename);
+}
+
 async function downloadPresetJson(preset, btn){
   const label = btn.querySelector('.preset-download-label');
   const originalLabel = label ? label.textContent : '';
@@ -2953,6 +2964,70 @@ async function downloadPresetJson(preset, btn){
     // CORS or a network hiccup on the JSON host — fall back to opening the
     // raw file directly so the click still does something useful.
     window.open(preset.jsonUrl, '_blank', 'noopener');
+  }
+}
+
+// Bundles the preset .json together with every wallpaper it uses into one
+// .zip: preset.json at the root, wallpapers/<filename> for each linked
+// wallpaper (full resolution, not the small preview). Falls back to a
+// plain .json download if JSZip failed to load or the preset has no
+// linked wallpapers to bundle.
+async function downloadPresetBundle(preset, btn){
+  if(typeof JSZip === 'undefined' || !Array.isArray(preset.wallpapers) || !preset.wallpapers.length){
+    return downloadPresetJson(preset, btn);
+  }
+
+  const label = btn.querySelector('.preset-download-label');
+  const originalLabel = label ? label.textContent : '';
+  const setLabel = text => { if(label) label.textContent = text; };
+
+  try{
+    setLabel('Zipping…');
+    btn.disabled = true;
+
+    const zip = new JSZip();
+    const jsonRes = await fetch(preset.jsonUrl, { cache:'force-cache' });
+    if(!jsonRes.ok) throw new Error(`Preset JSON responded ${jsonRes.status}`);
+    zip.file(preset.jsonFilename || 'preset.json', await jsonRes.blob());
+
+    const wallpapersFolder = zip.folder('wallpapers');
+    const results = await Promise.allSettled(
+      preset.wallpapers.map(async filename => {
+        const res = await fetch(fullWallpaperUrl(filename));
+        if(!res.ok) throw new Error(`${filename} responded ${res.status}`);
+        wallpapersFolder.file(filename, await res.blob());
+      })
+    );
+    const missing = results
+      .map((r, i) => r.status === 'rejected' ? preset.wallpapers[i] : null)
+      .filter(Boolean);
+    if(missing.length){
+      zip.file(
+        'wallpapers/MISSING.txt',
+        `These wallpapers couldn't be fetched (renamed or removed from the repo?):\n${missing.join('\n')}`
+      );
+    }
+
+    const zipBlob = await zip.generateAsync({ type:'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${slugify(preset.title)}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+    btn.classList.add('is-success');
+    setLabel(missing.length ? 'Downloaded (some wallpapers missing)' : 'Downloaded!');
+    setTimeout(() => { btn.classList.remove('is-success'); setLabel(originalLabel); }, 2400);
+  }catch(err){
+    console.warn('Preset bundle failed, falling back to plain JSON:', err.message);
+    setLabel(originalLabel);
+    btn.disabled = false;
+    return downloadPresetJson(preset, btn);
+  }finally{
+    btn.disabled = false;
   }
 }
 
@@ -3043,15 +3118,16 @@ function buildPresetCard(preset){
     body.appendChild(row);
   }
 
+  const hasWallpapers = Array.isArray(preset.wallpapers) && preset.wallpapers.length > 0;
   const downloadBtn = document.createElement('button');
   downloadBtn.type = 'button';
   downloadBtn.className = 'filled-btn preset-download-btn';
   downloadBtn.innerHTML = `
     <svg class="icon-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M4 19h16"/></svg>
     <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" hidden><polyline points="20 6 9 17 4 12"/></svg>
-    <span class="preset-download-label">Download preset.json</span>
+    <span class="preset-download-label">${hasWallpapers ? 'Download preset + wallpapers (.zip)' : 'Download preset.json'}</span>
   `;
-  downloadBtn.addEventListener('click', () => downloadPresetJson(preset, downloadBtn));
+  downloadBtn.addEventListener('click', () => downloadPresetBundle(preset, downloadBtn));
   body.appendChild(downloadBtn);
 
   card.append(shotBtn, body);
