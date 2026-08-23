@@ -724,11 +724,18 @@
     line-height:1.5;
     color:var(--md-on-surface-variant);
   }
+  .preset-link-groups{
+    display:flex;
+    flex-wrap:wrap;
+    gap:16px;
+    margin-top:2px;
+  }
   .preset-linked-row{
     display:flex;
     flex-direction:column;
     gap:8px;
-    margin-top:2px;
+    flex:1 1 130px;
+    min-width:130px;
   }
   .preset-linked-label{
     font-size:11px;
@@ -767,6 +774,34 @@
     margin-top:6px;
     align-self:flex-start;
   }
+
+  /* ---------- Preset image popup ---------- */
+  .preset-lightbox-img{
+    max-width:min(1100px,92vw);
+    max-height:88vh;
+    border-radius:var(--shape-lg);
+    box-shadow:0 18px 50px rgba(0,0,0,.4);
+    display:block;
+  }
+  .preset-lightbox-close{
+    position:absolute;
+    top:18px;
+    right:18px;
+    width:44px;
+    height:44px;
+    border-radius:var(--shape-lg);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:color-mix(in srgb,var(--md-primary) 16%,transparent);
+    border:1px solid color-mix(in srgb,var(--md-primary) 26%,transparent);
+    color:var(--md-on-surface);
+    cursor:pointer;
+  }
+  .preset-lightbox-close:hover{
+    background:color-mix(in srgb,var(--md-primary) 28%,var(--md-secondary-container) 72%);
+  }
+  .preset-lightbox-close svg{width:19px;height:19px}
 
   /* ---------- Viewport-based image loading ---------- */
 /*
@@ -2786,6 +2821,13 @@
     </a>
   </footer>
 
+  <div class="scrim" id="presetLightbox" hidden>
+    <button type="button" class="preset-lightbox-close" id="presetLightboxClose" aria-label="Close preview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+    <img class="preset-lightbox-img" id="presetLightboxImg" src="" alt="">
+  </div>
+
 <script>
 const GITHUB_SOURCE = {
   user:   'Blapples',
@@ -3036,6 +3078,29 @@ async function downloadPresetBundle(preset, btn){
   }
 }
 
+function openPresetLightbox(src, alt){
+  const scrim = document.getElementById('presetLightbox');
+  const img = document.getElementById('presetLightboxImg');
+  img.src = src;
+  img.alt = alt || '';
+  scrim.hidden = false;
+}
+
+function closePresetLightbox(){
+  const scrim = document.getElementById('presetLightbox');
+  const img = document.getElementById('presetLightboxImg');
+  scrim.hidden = true;
+  img.src = '';
+}
+
+document.getElementById('presetLightboxClose').addEventListener('click', closePresetLightbox);
+document.getElementById('presetLightbox').addEventListener('click', e => {
+  if(e.target.id === 'presetLightbox') closePresetLightbox();
+});
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && !document.getElementById('presetLightbox').hidden) closePresetLightbox();
+});
+
 function buildPresetCard(preset){
   const card = document.createElement('article');
   card.className = 'preset-card';
@@ -3051,7 +3116,7 @@ function buildPresetCard(preset){
   shotImg.loading = 'lazy';
   shotImg.decoding = 'async';
   shotBtn.appendChild(shotImg);
-  shotBtn.addEventListener('click', () => window.open(preset.screenshot, '_blank', 'noopener'));
+  shotBtn.addEventListener('click', () => openPresetLightbox(preset.screenshot, `${preset.title} preview`));
 
   const body = document.createElement('div');
   body.className = 'preset-body';
@@ -3066,71 +3131,81 @@ function buildPresetCard(preset){
 
   body.append(title, desc);
 
-  if(Array.isArray(preset.extraScreenshots) && preset.extraScreenshots.length){
-    const row = document.createElement('div');
-    row.className = 'preset-linked-row';
-    const rowLabel = document.createElement('span');
-    rowLabel.className = 'preset-linked-label';
-    rowLabel.textContent = 'More previews';
-    const thumbs = document.createElement('div');
-    thumbs.className = 'preset-linked-thumbs';
-    preset.extraScreenshots.forEach(shot => {
-      const thumbBtn = document.createElement('button');
-      thumbBtn.type = 'button';
-      thumbBtn.className = 'preset-linked-thumb';
-      thumbBtn.setAttribute('aria-label', shot.label);
-      thumbBtn.title = shot.label;
-      const thumbImg = document.createElement('img');
-      thumbImg.src = makePreviewUrl(shot.url, 120);
-      thumbImg.alt = shot.label;
-      thumbImg.loading = 'lazy';
-      thumbImg.decoding = 'async';
-      thumbBtn.appendChild(thumbImg);
-      thumbBtn.addEventListener('click', () => window.open(shot.url, '_blank', 'noopener'));
-      thumbs.appendChild(thumbBtn);
-    });
-    row.append(rowLabel, thumbs);
-    body.appendChild(row);
+  const hasExtras = Array.isArray(preset.extraScreenshots) && preset.extraScreenshots.length;
+  const hasWallpapers = Array.isArray(preset.wallpapers) && preset.wallpapers.length;
+
+  if(hasExtras || hasWallpapers){
+    const groups = document.createElement('div');
+    groups.className = 'preset-link-groups';
+
+    if(hasExtras){
+      const row = document.createElement('div');
+      row.className = 'preset-linked-row';
+      const rowLabel = document.createElement('span');
+      rowLabel.className = 'preset-linked-label';
+      rowLabel.textContent = 'More previews';
+      const thumbs = document.createElement('div');
+      thumbs.className = 'preset-linked-thumbs';
+      preset.extraScreenshots.forEach(shot => {
+        const thumbBtn = document.createElement('button');
+        thumbBtn.type = 'button';
+        thumbBtn.className = 'preset-linked-thumb';
+        thumbBtn.setAttribute('aria-label', shot.label);
+        thumbBtn.title = shot.label;
+        const thumbImg = document.createElement('img');
+        thumbImg.src = makePreviewUrl(shot.url, 120);
+        thumbImg.alt = shot.label;
+        thumbImg.loading = 'lazy';
+        thumbImg.decoding = 'async';
+        thumbBtn.appendChild(thumbImg);
+        thumbBtn.addEventListener('click', () => openPresetLightbox(shot.url, shot.label));
+        thumbs.appendChild(thumbBtn);
+      });
+      row.append(rowLabel, thumbs);
+      groups.appendChild(row);
+    }
+
+    if(hasWallpapers){
+      const row = document.createElement('div');
+      row.className = 'preset-linked-row';
+      const rowLabel = document.createElement('span');
+      rowLabel.className = 'preset-linked-label';
+      rowLabel.textContent = 'Wallpapers used';
+      const thumbs = document.createElement('div');
+      thumbs.className = 'preset-linked-thumbs';
+      preset.wallpapers.forEach(filename => {
+        // Links back to the main collection page, which auto-scrolls to and
+        // opens this exact wallpaper via the ?wallpaper= query param.
+        const thumbLink = document.createElement('a');
+        thumbLink.className = 'preset-linked-thumb';
+        thumbLink.href = `index.html?wallpaper=${encodeURIComponent(filename)}`;
+        thumbLink.target = '_blank';
+        thumbLink.rel = 'noopener';
+        thumbLink.setAttribute('aria-label', `Open ${filename} in the wallpaper collection`);
+        thumbLink.title = filename;
+        const thumbImg = document.createElement('img');
+        thumbImg.src = makePreviewUrl(rawWallpaperUrl(filename), 120);
+        thumbImg.alt = filename;
+        thumbImg.loading = 'lazy';
+        thumbImg.decoding = 'async';
+        thumbLink.appendChild(thumbImg);
+        thumbs.appendChild(thumbLink);
+      });
+      row.append(rowLabel, thumbs);
+      groups.appendChild(row);
+    }
+
+    body.appendChild(groups);
   }
 
-  if(Array.isArray(preset.wallpapers) && preset.wallpapers.length){
-    const row = document.createElement('div');
-    row.className = 'preset-linked-row';
-    const rowLabel = document.createElement('span');
-    rowLabel.className = 'preset-linked-label';
-    rowLabel.textContent = 'Wallpapers used';
-    const thumbs = document.createElement('div');
-    thumbs.className = 'preset-linked-thumbs';
-    preset.wallpapers.forEach(filename => {
-      // Links back to the main collection page, which auto-scrolls to and
-      // opens this exact wallpaper via the ?wallpaper= query param.
-      const thumbLink = document.createElement('a');
-      thumbLink.className = 'preset-linked-thumb';
-      thumbLink.href = `index.html?wallpaper=${encodeURIComponent(filename)}`;
-      thumbLink.target = '_blank';
-      thumbLink.rel = 'noopener';
-      thumbLink.setAttribute('aria-label', `Open ${filename} in the wallpaper collection`);
-      thumbLink.title = filename;
-      const thumbImg = document.createElement('img');
-      thumbImg.src = makePreviewUrl(rawWallpaperUrl(filename), 120);
-      thumbImg.alt = filename;
-      thumbImg.loading = 'lazy';
-      thumbImg.decoding = 'async';
-      thumbLink.appendChild(thumbImg);
-      thumbs.appendChild(thumbLink);
-    });
-    row.append(rowLabel, thumbs);
-    body.appendChild(row);
-  }
-
-  const hasWallpapers = Array.isArray(preset.wallpapers) && preset.wallpapers.length > 0;
+  const hasWallpapersForZip = Array.isArray(preset.wallpapers) && preset.wallpapers.length > 0;
   const downloadBtn = document.createElement('button');
   downloadBtn.type = 'button';
   downloadBtn.className = 'filled-btn preset-download-btn';
   downloadBtn.innerHTML = `
     <svg class="icon-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M4 19h16"/></svg>
     <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" hidden><polyline points="20 6 9 17 4 12"/></svg>
-    <span class="preset-download-label">${hasWallpapers ? 'Download preset + wallpapers (.zip)' : 'Download preset.json'}</span>
+    <span class="preset-download-label">${hasWallpapersForZip ? 'Download preset + wallpapers (.zip)' : 'Download preset.json'}</span>
   `;
   downloadBtn.addEventListener('click', () => downloadPresetBundle(preset, downloadBtn));
   body.appendChild(downloadBtn);
