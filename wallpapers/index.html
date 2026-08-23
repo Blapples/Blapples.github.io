@@ -656,6 +656,117 @@
     .new-badge::before{animation:none}
   }
 
+  /* ---------- Widget Presets section ---------- */
+  .presets-section{
+    width:min(1440px,calc(100% - 36px));
+    margin:-6px auto 40px;
+  }
+  .presets-section[hidden]{display:none}
+
+  .presets-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    gap:18px;
+  }
+  @media (max-width:900px){
+    .presets-grid{grid-template-columns:1fr}
+  }
+
+  .preset-card{
+    display:flex;
+    flex-direction:column;
+    border-radius:var(--shape-lg);
+    background:var(--md-surface-container);
+    border:1px solid var(--md-outline);
+    box-shadow:var(--elev-1);
+    overflow:hidden;
+    transition:transform .3s var(--spring),box-shadow .3s var(--standard);
+  }
+  .preset-card:hover{
+    transform:translateY(-4px);
+    box-shadow:var(--elev-2);
+  }
+  .preset-screenshot-btn{
+    display:block;
+    width:100%;
+    padding:0;
+    cursor:pointer;
+    overflow:hidden;
+  }
+  .preset-screenshot{
+    width:100%;
+    aspect-ratio:16 / 10;
+    object-fit:cover;
+    display:block;
+    background:
+      radial-gradient(circle at 50% 35%,rgba(177,190,140,.20),transparent 55%),
+      rgba(8,10,7,.92);
+    transition:transform .5s var(--standard);
+  }
+  .preset-screenshot-btn:hover .preset-screenshot{transform:scale(1.04)}
+  .preset-body{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    padding:16px 18px 18px;
+  }
+  .preset-title{
+    margin:0;
+    font-size:17px;
+    font-weight:700;
+    letter-spacing:-.01em;
+    color:var(--md-on-surface);
+  }
+  .preset-desc{
+    margin:0;
+    font-size:13.5px;
+    line-height:1.5;
+    color:var(--md-on-surface-variant);
+  }
+  .preset-linked-row{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-top:2px;
+  }
+  .preset-linked-label{
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    color:var(--md-on-surface-variant);
+  }
+  .preset-linked-thumbs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .preset-linked-thumb{
+    width:52px;
+    height:52px;
+    padding:0;
+    border-radius:12px;
+    overflow:hidden;
+    border:1px solid var(--md-outline);
+    cursor:pointer;
+    flex:0 0 auto;
+    transition:transform .25s var(--spring),border-color .25s ease;
+  }
+  .preset-linked-thumb:hover{
+    transform:scale(1.08);
+    border-color:var(--md-primary);
+  }
+  .preset-linked-thumb img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .preset-download-btn{
+    margin-top:6px;
+    align-self:flex-start;
+  }
+
   /* ---------- Viewport-based image loading ---------- */
 /*
  * Images are only assigned their real source when they are close to the
@@ -2638,6 +2749,9 @@
         <button type="button" class="icon-btn" id="roastToggleBtn" aria-pressed="false" aria-label="Turn on Roast Me captions">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5c-1 2-3.2 4-3.2 7.3a3.2 3.2 0 0 0 6.4 0c0-1-.4-1.7-.4-1.7s-.2 1.1-1 1.1c.5-1.6-.5-2.7-.5-3.8 0 0-1 .6-1 1.7-.5-.6-.5-1.7 0-3.3 0 0-.3-.7-.3-1.3z"/><path d="M9 13.2c-1.6 1-2.6 2.6-2.6 4.6a5.6 5.6 0 0 0 11.2 0c0-2.6-1.5-4.2-1.5-4.2s.1 1.8-1.1 2.5c.6-2.4-1-3.6-1-3.6"/></svg>
         </button>
+        <a class="icon-btn" href="blapples_widget_presets.html" aria-label="Browse widget presets">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        </a>
       </div>
     </div>
   </header>
@@ -6198,7 +6312,48 @@ const animateNavigation = (button, direction) => {
     if(button) animateNavigation(button, event.key === 'ArrowRight' ? 1 : -1);
   }, true);
 })();
+
+/* ---------- Deep link from the Widget Presets page ----------
+   The presets page (blapples_widget_presets.html) links its "wallpapers
+   used" thumbnails to this page as
+   blapples_wallpaper_collection.html?wallpaper=<filename>. On load, find
+   that wallpaper (once the gallery has finished loading — it's async),
+   scroll to it, pulse it, and open the lightbox. */
+function findFrameByFilename(filename){
+  const target = filename.trim().toLowerCase();
+  return Object.values(frameData).find(f => f && f.filename && f.filename.toLowerCase() === target) || null;
+}
+
+function waitForFrameByFilename(filename, timeoutMs = 8000){
+  return new Promise(resolve => {
+    const started = Date.now();
+    (function poll(){
+      const found = findFrameByFilename(filename);
+      if(found) return resolve(found);
+      if(Date.now() - started >= timeoutMs) return resolve(null);
+      setTimeout(poll, 150);
+    })();
+  });
+}
+
+async function openWallpaperFromDeepLink(filename){
+  const frame = await waitForFrameByFilename(filename);
+  if(!frame || !frame._card) return;
+  const card = frame._card;
+  card.scrollIntoView({ behavior:'smooth', block:'center' });
+  setTimeout(() => {
+    card.classList.add('pulse');
+    setTimeout(() => {
+      card.classList.remove('pulse');
+      openLightbox(frame.frameNo);
+    }, 350);
+  }, 450);
+}
+
+const deepLinkWallpaper = new URLSearchParams(window.location.search).get('wallpaper');
+if(deepLinkWallpaper) openWallpaperFromDeepLink(deepLinkWallpaper);
 </script>
 
 </body>
 </html>
+
