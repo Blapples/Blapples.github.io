@@ -3272,7 +3272,7 @@ function trackNewWallpapers(frames, isAuthoritative=true){
  * applyGitHistoryNewFlags below); the guess above still handles the very
  * first, instant paint before this network round-trip finishes.
  */
-const NEW_COMMITS_CACHE_KEY = 'blapples-wallpaper-recent-commits-v1';
+const NEW_COMMITS_CACHE_KEY = 'blapples-wallpaper-recent-commits-v2';
 // An hour is plenty fresh for a "within the last 7 days" badge, and keeps a
 // burst of page loads from re-walking commit history every single time.
 const NEW_COMMITS_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -3316,13 +3316,23 @@ async function fetchRecentlyAddedFilenames(){
   // A week's worth of uploads is normally a handful of commits, not dozens -
   // capped defensively so an unusually active repo can't turn this into an
   // unbounded pile of follow-up requests against the (unauthenticated,
-  // 60/hour) GitHub API.
-  const capped = commits.slice(0, 25);
+  // 60/hour) GitHub API. Padded a bit above a strict "handful" so a busy
+  // week of preset-testing commits (filtered out below anyway) doesn't
+  // crowd real wallpaper-upload commits out of this window entirely.
+  const capped = commits.slice(0, 40);
   const details = await Promise.all(capped.map(c =>
     fetch(`https://api.github.com/repos/${user}/${repo}/commits/${c.sha}`, { headers:{ Accept:'application/vnd.github+json' } })
       .then(r => r.ok ? r.json() : null)
       .catch(()=>null)
   ));
+
+  // Wallpapers live at the repo root. The /presets subfolder shares this
+  // same repo (screenshots, meta.json, preset .json files) and commits
+  // there would otherwise get miscounted as "new wallpapers" — or worse,
+  // crowd real wallpaper-upload commits out of the 25-commit cap above.
+  // Only root-level image files count.
+  const PRESETS_SUBFOLDER = 'presets/';
+  const WALLPAPER_IMAGE_EXT = /\.(png|jpe?g|webp|gif)$/i;
 
   const added = {};
   details.forEach((detail, i) => {
@@ -3333,6 +3343,8 @@ async function fetchRecentlyAddedFilenames(){
       // Only a file actually being added counts as new - an edit or rename
       // of an existing wallpaper shouldn't relaunch it as "new" again.
       if(f.status !== 'added') return;
+      if(f.filename.startsWith(PRESETS_SUBFOLDER)) return;
+      if(!WALLPAPER_IMAGE_EXT.test(f.filename)) return;
       const filename = f.filename.split('/').pop();
       if(!(filename in added) || commitDate < added[filename]){
         added[filename] = commitDate;
@@ -6356,4 +6368,3 @@ if(deepLinkWallpaper) openWallpaperFromDeepLink(deepLinkWallpaper);
 
 </body>
 </html>
-
