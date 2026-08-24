@@ -3272,7 +3272,7 @@ function trackNewWallpapers(frames, isAuthoritative=true){
  * applyGitHistoryNewFlags below); the guess above still handles the very
  * first, instant paint before this network round-trip finishes.
  */
-const NEW_COMMITS_CACHE_KEY = 'blapples-wallpaper-recent-commits-v2';
+const NEW_COMMITS_CACHE_KEY = 'blapples-wallpaper-recent-commits-v3';
 // An hour is plenty fresh for a "within the last 7 days" badge, and keeps a
 // burst of page loads from re-walking commit history every single time.
 const NEW_COMMITS_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -3313,43 +3313,55 @@ async function fetchRecentlyAddedFilenames(){
   const commits = await res.json();
   if(!Array.isArray(commits)) throw new Error('Unexpected GitHub commits response');
 
-  // A week's worth of uploads is normally a handful of commits, not dozens -
-  // capped defensively so an unusually active repo can't turn this into an
-  // unbounded pile of follow-up requests against the (unauthenticated,
-  // 60/hour) GitHub API. Padded a bit above a strict "handful" so a busy
-  // week of preset-testing commits (filtered out below anyway) doesn't
-  // crowd real wallpaper-upload commits out of this window entirely.
-  const capped = commits.slice(0, 40);
-  const details = await Promise.all(capped.map(c =>
-    fetch(`https://api.github.com/repos/${user}/${repo}/commits/${c.sha}`, { headers:{ Accept:'application/vnd.github+json' } })
-      .then(r => r.ok ? r.json() : null)
-      .catch(()=>null)
-  ));
-
   // Wallpapers live at the repo root. The /presets subfolder shares this
   // same repo (screenshots, meta.json, preset .json files) and commits
-  // there would otherwise get miscounted as "new wallpapers" — or worse,
-  // crowd real wallpaper-upload commits out of the 25-commit cap above.
-  // Only root-level image files count.
+  // there would otherwise get miscounted as "new wallpapers". Only
+  // root-level image files count.
   const PRESETS_SUBFOLDER = 'presets/';
   const WALLPAPER_IMAGE_EXT = /\.(png|jpe?g|webp|gif)$/i;
-
   const added = {};
-  details.forEach((detail, i) => {
-    if(!detail || !Array.isArray(detail.files)) return;
-    const dateStr = capped[i].commit?.author?.date || capped[i].commit?.committer?.date;
-    const commitDate = dateStr ? new Date(dateStr).getTime() : Date.now();
-    detail.files.forEach(f => {
-      // Only a file actually being added counts as new - an edit or rename
-      // of an existing wallpaper shouldn't relaunch it as "new" again.
-      if(f.status !== 'added') return;
-      if(f.filename.startsWith(PRESETS_SUBFOLDER)) return;
-      if(!WALLPAPER_IMAGE_EXT.test(f.filename)) return;
-      const filename = f.filename.split('/').pop();
-      if(!(filename in added) || commitDate < added[filename]){
-        added[filename] = commitDate;
-      }
-    });
+
+  if(!commits.length){
+    writeRecentCommitsCache(added);
+    return added;
+  }
+
+  // A previous version of this check fetched every commit's full detail
+  // individually — up to 40 extra requests against the unauthenticated,
+  // 60/hour GitHub API, on top of everything else the site and its visitors
+  // already use that same quota for. That's what was causing the New
+  // Wallpapers section to work, then fail, then work again on an
+  // inconsistent cycle: it only succeeded when 40 near-simultaneous
+  // requests happened to fit in whatever quota was left.
+  //
+  // GitHub's "compare" endpoint returns the combined file diff across an
+  // entire commit range in ONE request, so this now costs 2 requests total
+  // (this list call + one compare call) no matter how many commits are in
+  // the window.
+  const head = commits[0].sha;
+  const oldest = commits[commits.length - 1];
+  const base = (oldest.parents && oldest.parents[0]) ? oldest.parents[0].sha : oldest.sha;
+  const headDateStr = commits[0].commit?.author?.date || commits[0].commit?.committer?.date;
+  // The compare endpoint gives one combined file list, not a date per file,
+  // so every newly-added file here is stamped with the most recent commit's
+  // date. That only affects sort order *within* the New section (which of
+  // several new wallpapers shows first) — whether something counts as
+  // "new" at all is still exactly determined by the `since` filter above.
+  const approxDate = headDateStr ? new Date(headDateStr).getTime() : Date.now();
+
+  const compareUrl = `https://api.github.com/repos/${user}/${repo}/compare/${base}...${head}`;
+  const cmpRes = await fetch(compareUrl, { headers:{ Accept:'application/vnd.github+json' } });
+  if(!cmpRes.ok) throw new Error(`GitHub compare API responded ${cmpRes.status}`);
+  const cmp = await cmpRes.json();
+
+  (cmp.files || []).forEach(f => {
+    // Only a file actually being added counts as new - an edit or rename
+    // of an existing wallpaper shouldn't relaunch it as "new" again.
+    if(f.status !== 'added') return;
+    if(f.filename.startsWith(PRESETS_SUBFOLDER)) return;
+    if(!WALLPAPER_IMAGE_EXT.test(f.filename)) return;
+    const filename = f.filename.split('/').pop();
+    added[filename] = approxDate;
   });
 
   writeRecentCommitsCache(added);
@@ -6368,3 +6380,4 @@ if(deepLinkWallpaper) openWallpaperFromDeepLink(deepLinkWallpaper);
 
 </body>
 </html>
+
