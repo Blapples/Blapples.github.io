@@ -3272,7 +3272,7 @@ function trackNewWallpapers(frames, isAuthoritative=true){
  * applyGitHistoryNewFlags below); the guess above still handles the very
  * first, instant paint before this network round-trip finishes.
  */
-const NEW_COMMITS_CACHE_KEY = 'blapples-wallpaper-recent-commits-v3';
+const NEW_COMMITS_CACHE_KEY = 'blapples-wallpaper-recent-commits-v4';
 // An hour is plenty fresh for a "within the last 7 days" badge, and keeps a
 // burst of page loads from re-walking commit history every single time.
 const NEW_COMMITS_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -3328,19 +3328,35 @@ async function fetchRecentlyAddedFilenames(){
 
   // A previous version of this check fetched every commit's full detail
   // individually — up to 40 extra requests against the unauthenticated,
-  // 60/hour GitHub API, on top of everything else the site and its visitors
-  // already use that same quota for. That's what was causing the New
-  // Wallpapers section to work, then fail, then work again on an
-  // inconsistent cycle: it only succeeded when 40 near-simultaneous
-  // requests happened to fit in whatever quota was left.
-  //
-  // GitHub's "compare" endpoint returns the combined file diff across an
-  // entire commit range in ONE request, so this now costs 2 requests total
-  // (this list call + one compare call) no matter how many commits are in
+  // 60/hour GitHub API. GitHub's "compare" endpoint returns the combined
+  // file diff across an entire commit range in ONE request instead, so
+  // this costs only 2-3 requests total no matter how many commits are in
   // the window.
+  //
+  // Compare needs a "base" commit — the point right BEFORE the window
+  // started — to diff against. Using the oldest in-window commit's own
+  // .parents[0] field seemed reasonable but is fragile: when there's only
+  // one commit in the window (exactly the case where you just uploaded a
+  // single new wallpaper), a missing/empty parents field falls back to
+  // using that SAME commit as its own base — and compare() only shows
+  // changes AFTER the base, so that commit's own additions silently
+  // vanish from the diff. That's what was causing a wallpaper to flash as
+  // new (from the local guess) and then get demoted once the "official"
+  // check came back with nothing.
+  //
+  // Fixed by asking GitHub directly for the real boundary commit instead
+  // of trusting the parents field.
   const head = commits[0].sha;
-  const oldest = commits[commits.length - 1];
-  const base = (oldest.parents && oldest.parents[0]) ? oldest.parents[0].sha : oldest.sha;
+  const boundaryUrl = `https://api.github.com/repos/${user}/${repo}/commits?sha=${encodeURIComponent(branch)}&until=${since}${pathParam}&per_page=1`;
+  const boundaryRes = await fetch(boundaryUrl, { headers:{ Accept:'application/vnd.github+json' } });
+  if(!boundaryRes.ok) throw new Error(`GitHub boundary-commit lookup responded ${boundaryRes.status}`);
+  const boundaryCommits = await boundaryRes.json();
+  if(!Array.isArray(boundaryCommits)) throw new Error('Unexpected GitHub boundary-commit response');
+  // No commit exists before the window at all (the repo's whole history
+  // fits inside the last 7 days) - nothing to diff against, so every
+  // in-window commit's additions are genuinely new by definition.
+  const base = boundaryCommits[0] ? boundaryCommits[0].sha : null;
+
   const headDateStr = commits[0].commit?.author?.date || commits[0].commit?.committer?.date;
   // The compare endpoint gives one combined file list, not a date per file,
   // so every newly-added file here is stamped with the most recent commit's
@@ -3349,12 +3365,32 @@ async function fetchRecentlyAddedFilenames(){
   // "new" at all is still exactly determined by the `since` filter above.
   const approxDate = headDateStr ? new Date(headDateStr).getTime() : Date.now();
 
-  const compareUrl = `https://api.github.com/repos/${user}/${repo}/compare/${base}...${head}`;
-  const cmpRes = await fetch(compareUrl, { headers:{ Accept:'application/vnd.github+json' } });
-  if(!cmpRes.ok) throw new Error(`GitHub compare API responded ${cmpRes.status}`);
-  const cmp = await cmpRes.json();
+  let files;
+  if(base){
+    const compareUrl = `https://api.github.com/repos/${user}/${repo}/compare/${base}...${head}`;
+    const cmpRes = await fetch(compareUrl, { headers:{ Accept:'application/vnd.github+json' } });
+    if(!cmpRes.ok) throw new Error(`GitHub compare API responded ${cmpRes.status}`);
+    const cmp = await cmpRes.json();
+    files = cmp.files || [];
+  }else{
+    // Whole-history edge case - fetch the single oldest commit's own
+    // detail directly (cheap: this only ever runs once for a brand new
+    // repo, not on every check) since there's no earlier point to diff
+    // against, then compare that commit forward to head for everything
+    // after it, if anything.
+    const oldest = commits[commits.length - 1];
+    const [oldestDetailRes, cmpRes] = await Promise.all([
+      fetch(`https://api.github.com/repos/${user}/${repo}/commits/${oldest.sha}`, { headers:{ Accept:'application/vnd.github+json' } }),
+      head !== oldest.sha
+        ? fetch(`https://api.github.com/repos/${user}/${repo}/compare/${oldest.sha}...${head}`, { headers:{ Accept:'application/vnd.github+json' } })
+        : Promise.resolve(null),
+    ]);
+    const oldestDetail = oldestDetailRes.ok ? await oldestDetailRes.json() : null;
+    const cmp = cmpRes && cmpRes.ok ? await cmpRes.json() : null;
+    files = [...(oldestDetail?.files || []), ...(cmp?.files || [])];
+  }
 
-  (cmp.files || []).forEach(f => {
+  files.forEach(f => {
     // Only a file actually being added counts as new - an edit or rename
     // of an existing wallpaper shouldn't relaunch it as "new" again.
     if(f.status !== 'added') return;
@@ -6380,4 +6416,3 @@ if(deepLinkWallpaper) openWallpaperFromDeepLink(deepLinkWallpaper);
 
 </body>
 </html>
-
