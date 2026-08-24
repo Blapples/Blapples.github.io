@@ -209,6 +209,9 @@
     height:22px;
     flex:0 0 22px;
   }
+  .topbar.is-compact .color-chip-count{
+    display:none;
+  }
 
   @media (min-width:641px) and (max-width:900px){
     .topbar.is-compact{
@@ -321,6 +324,11 @@
   .topbar.is-compact .topbar-toggles .icon-btn svg{
     width:16px;
     height:16px;
+  }
+  .topbar.is-compact .topbar-toggles .icon-btn.back-link{
+    width:auto;
+    padding:0 12px 0 9px;
+    font-size:12.5px;
   }
 
   /* Color filter — Material Expressive filter-chip row for narrowing the
@@ -1182,6 +1190,18 @@
   }
   .icon-btn:active{transform:scale(.9)}
   .icon-btn svg{width:19px;height:19px}
+
+  .icon-btn.back-link{
+    width:auto;
+    height:44px;
+    padding:0 16px 0 12px;
+    gap:8px;
+    display:inline-flex;
+    align-items:center;
+    text-decoration:none;
+    font-size:13.5px;
+    font-weight:600;
+  }
 
   /* ---------- Button press ripple ----------
      A quick radial burst from the pointer position on press, on every
@@ -2749,8 +2769,9 @@
         <button type="button" class="icon-btn" id="roastToggleBtn" aria-pressed="false" aria-label="Turn on Roast Me captions">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5c-1 2-3.2 4-3.2 7.3a3.2 3.2 0 0 0 6.4 0c0-1-.4-1.7-.4-1.7s-.2 1.1-1 1.1c.5-1.6-.5-2.7-.5-3.8 0 0-1 .6-1 1.7-.5-.6-.5-1.7 0-3.3 0 0-.3-.7-.3-1.3z"/><path d="M9 13.2c-1.6 1-2.6 2.6-2.6 4.6a5.6 5.6 0 0 0 11.2 0c0-2.6-1.5-4.2-1.5-4.2s.1 1.8-1.1 2.5c.6-2.4-1-3.6-1-3.6"/></svg>
         </button>
-        <a class="icon-btn" href="blapples_widget_presets.html" aria-label="Browse widget presets">
+        <a class="icon-btn back-link" href="blapples_widget_presets.html" aria-label="Browse widget presets">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          <span>Widget Presets</span>
         </a>
       </div>
     </div>
