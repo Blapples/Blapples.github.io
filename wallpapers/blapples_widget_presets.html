@@ -711,6 +711,32 @@
     gap:10px;
     padding:16px 18px 18px;
   }
+  .preset-title-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .preset-pfp{
+    width:34px;
+    height:34px;
+    padding:0;
+    border-radius:50%;
+    overflow:hidden;
+    flex:0 0 auto;
+    border:1px solid var(--md-outline);
+    cursor:pointer;
+    transition:transform .25s var(--spring),border-color .25s ease;
+  }
+  .preset-pfp:hover{
+    transform:scale(1.08);
+    border-color:var(--md-primary);
+  }
+  .preset-pfp img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
   .preset-title{
     margin:0;
     font-size:17px;
@@ -2934,18 +2960,29 @@ async function fetchPresetsFromGitHub(src){
     }
   }
 
-  // Given a folder's collected images, pick the "main" one: an explicit
-  // meta.json filename wins, then anything with "desktop" in its name,
-  // then whatever's first. Everything else becomes secondary previews.
-  function pickScreenshots(images, meta){
-    if(!images.length) return { main:null, extra:[] };
+  // Given a folder's collected images, pick the "main" screenshot: an
+  // explicit meta.json filename wins, then anything with "desktop" in its
+  // name, then whatever's first. Everything else becomes secondary
+  // previews — except the profile picture, which is pulled out on its own
+  // (an explicit meta.json "pfp" wins, otherwise anything with "pfp" or
+  // "avatar" in its filename) so it doesn't get mixed in as a screenshot.
+  function pickAssets(images, meta){
+    if(!images.length) return { main:null, extra:[], pfp:null };
     const byName = f => images.find(img => img.filename.toLowerCase() === f.toLowerCase());
+
+    const pfp =
+      (meta.pfp && byName(meta.pfp)) ||
+      images.find(img => /pfp|avatar/i.test(img.filename)) ||
+      null;
+    const remaining = pfp ? images.filter(img => img !== pfp) : images;
+
+    if(!remaining.length) return { main:null, extra:[], pfp };
     const main =
       (meta.screenshot && byName(meta.screenshot)) ||
-      images.find(img => /desktop/i.test(img.filename)) ||
-      images[0];
-    const extra = images.filter(img => img !== main);
-    return { main, extra };
+      remaining.find(img => /desktop/i.test(img.filename)) ||
+      remaining[0];
+    const extra = remaining.filter(img => img !== main);
+    return { main, extra, pfp };
   }
 
   const presets = await Promise.all(
@@ -2958,7 +2995,8 @@ async function fetchPresetsFromGitHub(src){
           if(metaRes.ok) meta = await metaRes.json();
         }catch(err){ /* meta is optional — fall back below */ }
       }
-      const { main, extra } = pickScreenshots(g.images, meta);
+      const { main, extra, pfp } = pickAssets(g.images, meta);
+      if(!main) return null; // only had a pfp image, no actual screenshot — skip
       return {
         title: meta.title || titleFromFilename(folder),
         description: meta.description || '',
@@ -2967,6 +3005,7 @@ async function fetchPresetsFromGitHub(src){
           url: presetRawUrl(img.path),
           label: /lock/i.test(img.filename) ? 'Lockscreen preview' : titleFromFilename(img.filename),
         })),
+        pfp: pfp ? { url: presetRawUrl(pfp.path), filename: pfp.filename } : null,
         jsonUrl: presetRawUrl(g.jsonPath),
         jsonFilename: g.jsonFilename,
         wallpapers: Array.isArray(meta.wallpapers) ? meta.wallpapers : [],
@@ -3020,7 +3059,8 @@ async function downloadPresetJson(preset, btn){
 // plain .json download if JSZip failed to load or the preset has no
 // linked wallpapers to bundle.
 async function downloadPresetBundle(preset, btn){
-  if(typeof JSZip === 'undefined' || !Array.isArray(preset.wallpapers) || !preset.wallpapers.length){
+  const hasWallpapers = Array.isArray(preset.wallpapers) && preset.wallpapers.length > 0;
+  if(typeof JSZip === 'undefined' || (!hasWallpapers && !preset.pfp)){
     return downloadPresetJson(preset, btn);
   }
 
@@ -3037,21 +3077,34 @@ async function downloadPresetBundle(preset, btn){
     if(!jsonRes.ok) throw new Error(`Preset JSON responded ${jsonRes.status}`);
     zip.file(preset.jsonFilename || 'preset.json', await jsonRes.blob());
 
-    const wallpapersFolder = zip.folder('wallpapers');
-    const results = await Promise.allSettled(
-      preset.wallpapers.map(async filename => {
-        const res = await fetch(fullWallpaperUrl(filename));
-        if(!res.ok) throw new Error(`${filename} responded ${res.status}`);
-        wallpapersFolder.file(filename, await res.blob());
-      })
-    );
-    const missing = results
-      .map((r, i) => r.status === 'rejected' ? preset.wallpapers[i] : null)
-      .filter(Boolean);
+    const missing = [];
+
+    if(preset.pfp){
+      try{
+        const pfpRes = await fetch(preset.pfp.url);
+        if(!pfpRes.ok) throw new Error(`${preset.pfp.filename} responded ${pfpRes.status}`);
+        zip.file(preset.pfp.filename, await pfpRes.blob());
+      }catch(err){
+        missing.push(preset.pfp.filename);
+      }
+    }
+
+    if(hasWallpapers){
+      const wallpapersFolder = zip.folder('wallpapers');
+      const results = await Promise.allSettled(
+        preset.wallpapers.map(async filename => {
+          const res = await fetch(fullWallpaperUrl(filename));
+          if(!res.ok) throw new Error(`${filename} responded ${res.status}`);
+          wallpapersFolder.file(filename, await res.blob());
+        })
+      );
+      results.forEach((r, i) => { if(r.status === 'rejected') missing.push(preset.wallpapers[i]); });
+    }
+
     if(missing.length){
       zip.file(
-        'wallpapers/MISSING.txt',
-        `These wallpapers couldn't be fetched (renamed or removed from the repo?):\n${missing.join('\n')}`
+        'MISSING.txt',
+        `These files couldn't be fetched (renamed or removed from the repo?):\n${missing.join('\n')}`
       );
     }
 
@@ -3066,7 +3119,7 @@ async function downloadPresetBundle(preset, btn){
     setTimeout(() => URL.revokeObjectURL(url), 10000);
 
     btn.classList.add('is-success');
-    setLabel(missing.length ? 'Downloaded (some wallpapers missing)' : 'Downloaded!');
+    setLabel(missing.length ? 'Downloaded (some files missing)' : 'Downloaded!');
     setTimeout(() => { btn.classList.remove('is-success'); setLabel(originalLabel); }, 2400);
   }catch(err){
     console.warn('Preset bundle failed, falling back to plain JSON:', err.message);
@@ -3121,15 +3174,35 @@ function buildPresetCard(preset){
   const body = document.createElement('div');
   body.className = 'preset-body';
 
+  const titleRow = document.createElement('div');
+  titleRow.className = 'preset-title-row';
+
+  if(preset.pfp){
+    const pfpBtn = document.createElement('button');
+    pfpBtn.type = 'button';
+    pfpBtn.className = 'preset-pfp';
+    pfpBtn.setAttribute('aria-label', `View profile picture used in ${preset.title}`);
+    pfpBtn.title = 'Profile picture used in this preset';
+    const pfpImg = document.createElement('img');
+    pfpImg.src = makePreviewUrl(preset.pfp.url, 96);
+    pfpImg.alt = `${preset.title} profile picture`;
+    pfpImg.loading = 'lazy';
+    pfpImg.decoding = 'async';
+    pfpBtn.appendChild(pfpImg);
+    pfpBtn.addEventListener('click', () => openPresetLightbox(preset.pfp.url, `${preset.title} profile picture`));
+    titleRow.appendChild(pfpBtn);
+  }
+
   const title = document.createElement('h3');
   title.className = 'preset-title';
   title.textContent = preset.title;
+  titleRow.appendChild(title);
 
   const desc = document.createElement('p');
   desc.className = 'preset-desc';
   desc.textContent = preset.description || '';
 
-  body.append(title, desc);
+  body.append(titleRow, desc);
 
   const hasExtras = Array.isArray(preset.extraScreenshots) && preset.extraScreenshots.length;
   const hasWallpapers = Array.isArray(preset.wallpapers) && preset.wallpapers.length;
@@ -3199,13 +3272,14 @@ function buildPresetCard(preset){
   }
 
   const hasWallpapersForZip = Array.isArray(preset.wallpapers) && preset.wallpapers.length > 0;
+  const willZip = hasWallpapersForZip || !!preset.pfp;
   const downloadBtn = document.createElement('button');
   downloadBtn.type = 'button';
   downloadBtn.className = 'filled-btn preset-download-btn';
   downloadBtn.innerHTML = `
     <svg class="icon-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M4 19h16"/></svg>
     <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" hidden><polyline points="20 6 9 17 4 12"/></svg>
-    <span class="preset-download-label">${hasWallpapersForZip ? 'Download preset + wallpapers (.zip)' : 'Download preset.json'}</span>
+    <span class="preset-download-label">${willZip ? 'Download preset + assets (.zip)' : 'Download preset.json'}</span>
   `;
   downloadBtn.addEventListener('click', () => downloadPresetBundle(preset, downloadBtn));
   body.appendChild(downloadBtn);
