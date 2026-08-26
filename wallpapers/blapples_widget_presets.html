@@ -770,6 +770,7 @@
   .preset-link-groups{
     display:flex;
     flex-wrap:wrap;
+    justify-content:space-between;
     gap:16px;
     margin-top:2px;
   }
@@ -777,8 +778,22 @@
     display:flex;
     flex-direction:column;
     gap:8px;
-    flex:1 1 130px;
-    min-width:130px;
+    /* Previously flex:1 1 130px stretched every row to an equal share of
+       the row's width regardless of how much content it actually held -
+       fine with two full rows of thumbnails, but a row with only one or
+       two thumbnails (a lot more common) got stretched into a wide empty
+       column with a big dead gap after its thumbnails, which read as
+       leftover blank space at the right edge of the card. Hugging content
+       instead (flex-basis auto, no grow) sizes each row to what it
+       actually needs; `justify-content:space-between` on the parent then
+       spreads a first and second group to the two edges of the card
+       (with the gap landing naturally between their labels instead of
+       trailing uselessly after the last one), so the row's full width
+       still reads as used. min-width keeps a single wide label (e.g.
+       "WALLPAPERS USED") from getting force-wrapped into an awkwardly
+       narrow column. */
+    flex:0 1 auto;
+    min-width:100px;
   }
   .preset-linked-label{
     font-size:11px;
@@ -815,7 +830,14 @@
   }
   .preset-download-btn{
     margin-top:6px;
-    align-self:flex-start;
+    /* Was align-self:flex-start, which (combined with .filled-btn's
+       inline-flex) left it only as wide as its own label text - leaving
+       the same kind of dead space beside it as the thumbnail rows had.
+       Stretching it to the full card width and centering its label reads
+       as a proper primary action across the bottom of the card instead
+       of a button floating in the left portion of a wider row. */
+    align-self:stretch;
+    justify-content:center;
   }
 
   /* Collapsed-by-default dropdown for extra assets (banner, CI image) that
@@ -854,17 +876,18 @@
   .preset-extras summary:hover{
     color:var(--md-on-surface);
   }
-  /* Height is animated by JS (see setupPresetExtras) so it works reliably
-     on every open/close, not just the first. `display:grid!important`
-     beats the UA stylesheet's `details:not([open]) > *{display:none}` so
-     the wrapper stays laid out (and measurable/animatable) even while
-     the <details> is closed; `height:auto` is the no-JS fallback. */
+  /* Height is animated by JS (see setupPresetExtras) via the Web Animations
+     API, not a CSS transition - that sidesteps the rAF/reflow timing races
+     that make transition-based height animation snap instead of glide on
+     some browsers. `display:grid!important` beats the UA stylesheet's
+     `details:not([open]) > *{display:none}` so the wrapper stays laid out
+     (and measurable/animatable) even while the <details> is closed;
+     `height:auto` below is the no-JS fallback. */
   .preset-extras > .preset-extras-body{
     display:grid !important;
     overflow:hidden;
     height:0;
     opacity:0;
-    transition:height .32s var(--standard),opacity .22s ease;
   }
   .preset-extras[open] > .preset-extras-body{
     height:auto;
@@ -3166,8 +3189,8 @@ async function downloadPresetJson(preset, btn){
 }
 
 // Bundles the preset .json together with every wallpaper it uses into one
-// .zip: preset.json and linked wallpapers at the root (full resolution,
-// not the small preview). Falls back to a
+// .zip: preset.json at the root, wallpapers/<filename> for each linked
+// wallpaper (full resolution, not the small preview). Falls back to a
 // plain .json download if JSZip failed to load or the preset has no
 // linked wallpapers to bundle.
 async function downloadPresetBundle(preset, btn){
@@ -3223,27 +3246,12 @@ async function downloadPresetBundle(preset, btn){
     }
 
     if(hasWallpapers){
+      const wallpapersFolder = zip.folder('wallpapers');
       const results = await Promise.allSettled(
-        preset.wallpapers.map(async (filename, index) => {
+        preset.wallpapers.map(async filename => {
           const res = await fetch(fullWallpaperUrl(filename));
           if(!res.ok) throw new Error(`${filename} responded ${res.status}`);
-
-          const blob = await res.blob();
-          const extension = filename.match(/\.[^.]+$/)?.[0] || '';
-
-          // The order in meta.json determines the role in the downloaded bundle:
-          // 1st wallpaper = desktop, 2nd wallpaper = lockscreen.
-          let outputName;
-          if(index === 0){
-            outputName = `desktop-wallpaper${extension}`;
-          }else if(index === 1){
-            outputName = `lockscreen-wallpaper${extension}`;
-          }else{
-            // Preserve the original filename for any additional wallpapers.
-            outputName = filename.split('/').pop();
-          }
-
-          zip.file(outputName, blob);
+          wallpapersFolder.file(filename, await res.blob());
         })
       );
       results.forEach((r, i) => { if(r.status === 'rejected') missing.push(preset.wallpapers[i]); });
@@ -3308,7 +3316,10 @@ document.addEventListener('keydown', e => {
 function setupPresetExtras(details, bodyEl){
   const summary = details.querySelector(':scope > summary');
   if(!summary) return;
+  let anim = null;
   let busy = false;
+  const DURATION = 320;
+  const EASE = 'cubic-bezier(.2,0,0,1)'; // matches --standard
 
   summary.addEventListener('click', (e) => {
     e.preventDefault();
@@ -3316,61 +3327,78 @@ function setupPresetExtras(details, bodyEl){
     details.open ? collapse() : expand();
   });
 
-  function onceTransitionEnd(fn){
-    let done = false;
-    const finish = () => {
-      if(done) return;
-      done = true;
-      bodyEl.removeEventListener('transitionend', handler);
-      clearTimeout(fallback);
-      fn();
+  // Driven by the Web Animations API instead of a CSS `transition` + rAF
+  // dance. WAAPI applies the first keyframe synchronously when the
+  // animation starts, so there's no frame-timing race where a 0px start
+  // and the target height can land in the same layout pass and skip the
+  // transition entirely (which is what caused the snap). It also lets one
+  // animation smoothly interrupt another (rapid open/close clicks) via
+  // .cancel() instead of fighting a still-running CSS transition.
+  function run(from, to, onDone){
+    busy = true;
+    // A `fill:'forwards'` animation keeps overriding the element's height
+    // and opacity even after it finishes - that override sits ABOVE plain
+    // inline/CSS styles and never goes away on its own. Detach the old
+    // animation's handlers before canceling it so its (now-stale) finish/
+    // cancel callbacks can't fire later and clobber the state of the
+    // animation we're about to start.
+    if(anim){
+      anim.onfinish = null;
+      anim.oncancel = null;
+      anim.cancel();
+      anim = null;
+    }
+    bodyEl.style.overflow = 'hidden';
+    const a = bodyEl.animate(
+      [
+        { height: from + 'px', opacity: from === 0 ? 0 : 1 },
+        { height: to + 'px', opacity: to === 0 ? 0 : 1 },
+      ],
+      { duration: DURATION, easing: EASE, fill: 'forwards' }
+    );
+    anim = a;
+    a.onfinish = () => {
+      if(anim === a) anim = null;
+      // Drop the persisted forwards-fill effect now that we're done with
+      // it, THEN hand the property back to plain inline/CSS styles in
+      // onDone() - otherwise this "finished" animation would keep silently
+      // overriding height/opacity forever, which is what made the content
+      // stay invisible after a toggle or two.
+      a.cancel();
+      busy = false;
+      onDone && onDone();
     };
-    const handler = (ev) => {
-      if(ev.target !== bodyEl || ev.propertyName !== 'height') return;
-      finish();
+    a.oncancel = () => {
+      if(anim === a) anim = null;
+      busy = false;
     };
-    bodyEl.addEventListener('transitionend', handler);
-    // Safety net: if the transition never fires (e.g. the target height is
-    // already 0, or the tab was backgrounded and the browser skipped the
-    // event) don't leave the dropdown permanently "busy" and unclickable.
-    const fallback = setTimeout(finish, 420);
   }
 
   function expand(){
-    busy = true;
     details.open = true;
-    bodyEl.style.transition = 'none';
-    bodyEl.style.height = '0px';
-    bodyEl.offsetHeight; // force reflow so the 0px start is committed
-    bodyEl.style.transition = '';
+    // Measure the TRUE natural content height by letting the `[open]`
+    // CSS rule's `height:auto` size the grid normally (details.open is
+    // already true, so it applies). Do NOT force height to 0px first: on
+    // a grid container that collapses its own (stretch-aligned) row
+    // track down to 0 too, so scrollHeight would read back a bogus few
+    // px instead of the real content height - the animation would then
+    // play out to that wrong tiny target, and the moment it finished and
+    // handed off to the `auto` CSS rule, the box would hard-snap to its
+    // real size with no transition at all.
+    bodyEl.style.height = '';
     const target = bodyEl.scrollHeight;
-    // A single requestAnimationFrame isn't reliable here: on some browsers
-    // the 0px start and the target-height write can both land in the same
-    // style/layout pass, so the box jumps straight to full height instead
-    // of transitioning through it - the "snap" this fixes. Waiting a full
-    // extra frame guarantees the 0px height has actually been painted
-    // before we change it, so there's always a real start point to
-    // transition from.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => { bodyEl.style.height = target + 'px'; });
-    });
-    onceTransitionEnd(() => {
+    run(0, target, () => {
       bodyEl.style.height = ''; // hand back to CSS `height:auto` at rest
-      busy = false;
+      bodyEl.style.overflow = '';
     });
   }
 
   function collapse(){
-    busy = true;
-    bodyEl.style.height = bodyEl.scrollHeight + 'px';
-    bodyEl.offsetHeight; // force reflow so the start height is committed
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => { bodyEl.style.height = '0px'; });
-    });
-    onceTransitionEnd(() => {
+    const start = bodyEl.scrollHeight;
+    run(start, 0, () => {
       details.open = false;
       bodyEl.style.height = '';
-      busy = false;
+      bodyEl.style.overflow = '';
     });
   }
 }
