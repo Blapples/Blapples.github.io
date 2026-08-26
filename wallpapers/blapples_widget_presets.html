@@ -3166,8 +3166,8 @@ async function downloadPresetJson(preset, btn){
 }
 
 // Bundles the preset .json together with every wallpaper it uses into one
-// .zip: preset.json at the root, wallpapers/<filename> for each linked
-// wallpaper (full resolution, not the small preview). Falls back to a
+// .zip: preset.json and linked wallpapers at the root (full resolution,
+// not the small preview). Falls back to a
 // plain .json download if JSZip failed to load or the preset has no
 // linked wallpapers to bundle.
 async function downloadPresetBundle(preset, btn){
@@ -3223,7 +3223,6 @@ async function downloadPresetBundle(preset, btn){
     }
 
     if(hasWallpapers){
-      const wallpapersFolder = zip.folder('wallpapers');
       const results = await Promise.allSettled(
         preset.wallpapers.map(async (filename, index) => {
           const res = await fetch(fullWallpaperUrl(filename));
