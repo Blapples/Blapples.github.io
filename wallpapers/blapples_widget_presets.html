@@ -664,13 +664,30 @@
   }
   .presets-section[hidden]{display:none}
 
+  /* True fixed-column masonry: each preset card is permanently assigned
+     (in JS, see renderPresetsGrid) to one column div, round-robin
+     left-to-right (card 1 -> col 1, card 2 -> col 2, ...), matching the
+     original grid's reading order. Cards are then stacked within their
+     column with flexbox. Because a card's column assignment never changes
+     on height change, expanding a card (e.g. the "Other assets" dropdown)
+     only pushes down the cards below it in that same column — cards in
+     other columns never move, unlike CSS `columns:` or row-based CSS Grid,
+     which reshuffle or grow whole rows whenever any card's height changes. */
   .presets-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    display:flex;
+    align-items:flex-start;
     gap:18px;
   }
+  .presets-column{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    flex:1 1 0;
+    min-width:0;
+  }
   @media (max-width:900px){
-    .presets-grid{grid-template-columns:1fr}
+    .presets-grid{flex-direction:column}
+    .presets-column{width:100%}
   }
 
   .preset-card{
@@ -837,7 +854,24 @@
   .preset-extras summary:hover{
     color:var(--md-on-surface);
   }
-  .preset-extras .preset-linked-thumbs{
+  /* Height is animated by JS (see setupPresetExtras) so it works reliably
+     on every open/close, not just the first. `display:grid!important`
+     beats the UA stylesheet's `details:not([open]) > *{display:none}` so
+     the wrapper stays laid out (and measurable/animatable) even while
+     the <details> is closed; `height:auto` is the no-JS fallback. */
+  .preset-extras > .preset-extras-body{
+    display:grid !important;
+    overflow:hidden;
+    height:0;
+    opacity:0;
+    transition:height .32s var(--standard),opacity .22s ease;
+  }
+  .preset-extras[open] > .preset-extras-body{
+    height:auto;
+    opacity:1;
+  }
+  .preset-extras-body > .preset-linked-thumbs{
+    overflow:hidden;
     margin-top:8px;
   }
 
@@ -3253,6 +3287,79 @@ document.addEventListener('keydown', e => {
   if(e.key === 'Escape' && !document.getElementById('presetLightbox').hidden) closePresetLightbox();
 });
 
+// Drives the "Other assets" <details> dropdown with a manually-animated
+// height instead of relying on a pure-CSS trick, so it eases open AND
+// closed reliably every single time (not just the first toggle).
+function setupPresetExtras(details, bodyEl){
+  const summary = details.querySelector(':scope > summary');
+  if(!summary) return;
+  let busy = false;
+
+  summary.addEventListener('click', (e) => {
+    e.preventDefault();
+    if(busy) return;
+    details.open ? collapse() : expand();
+  });
+
+  function onceTransitionEnd(fn){
+    let done = false;
+    const finish = () => {
+      if(done) return;
+      done = true;
+      bodyEl.removeEventListener('transitionend', handler);
+      clearTimeout(fallback);
+      fn();
+    };
+    const handler = (ev) => {
+      if(ev.target !== bodyEl || ev.propertyName !== 'height') return;
+      finish();
+    };
+    bodyEl.addEventListener('transitionend', handler);
+    // Safety net: if the transition never fires (e.g. the target height is
+    // already 0, or the tab was backgrounded and the browser skipped the
+    // event) don't leave the dropdown permanently "busy" and unclickable.
+    const fallback = setTimeout(finish, 420);
+  }
+
+  function expand(){
+    busy = true;
+    details.open = true;
+    bodyEl.style.transition = 'none';
+    bodyEl.style.height = '0px';
+    bodyEl.offsetHeight; // force reflow so the 0px start is committed
+    bodyEl.style.transition = '';
+    const target = bodyEl.scrollHeight;
+    // A single requestAnimationFrame isn't reliable here: on some browsers
+    // the 0px start and the target-height write can both land in the same
+    // style/layout pass, so the box jumps straight to full height instead
+    // of transitioning through it - the "snap" this fixes. Waiting a full
+    // extra frame guarantees the 0px height has actually been painted
+    // before we change it, so there's always a real start point to
+    // transition from.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => { bodyEl.style.height = target + 'px'; });
+    });
+    onceTransitionEnd(() => {
+      bodyEl.style.height = ''; // hand back to CSS `height:auto` at rest
+      busy = false;
+    });
+  }
+
+  function collapse(){
+    busy = true;
+    bodyEl.style.height = bodyEl.scrollHeight + 'px';
+    bodyEl.offsetHeight; // force reflow so the start height is committed
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => { bodyEl.style.height = '0px'; });
+    });
+    onceTransitionEnd(() => {
+      details.open = false;
+      bodyEl.style.height = '';
+      busy = false;
+    });
+  }
+}
+
 function buildPresetCard(preset){
   const card = document.createElement('article');
   card.className = 'preset-card';
@@ -3412,8 +3519,12 @@ function buildPresetCard(preset){
       extraThumbs.appendChild(ciBtn);
     }
 
-    extras.appendChild(extraThumbs);
+    const extrasBody = document.createElement('div');
+    extrasBody.className = 'preset-extras-body';
+    extrasBody.appendChild(extraThumbs);
+    extras.appendChild(extrasBody);
     body.appendChild(extras);
+    setupPresetExtras(extras, extrasBody);
   }
 
   const hasWallpapersForZip = Array.isArray(preset.wallpapers) && preset.wallpapers.length > 0;
@@ -3458,11 +3569,60 @@ function writePresetsCache(presets){
   }
 }
 
-function renderPresetsGrid(presets){
+// How many columns to lay the grid out in, based on available width — the
+// same ~300px-per-column sizing the old `columns:300px` CSS used, plus the
+// same <=900px "always 1 column" breakpoint used elsewhere on this page.
+function presetColumnCount(){
   const presetsGrid = document.getElementById('presetsGrid');
-  presetsGrid.innerHTML = '';
-  presets.forEach(preset => presetsGrid.appendChild(buildPresetCard(preset)));
+  if(window.innerWidth <= 900) return 1;
+  const width = presetsGrid ? presetsGrid.clientWidth : window.innerWidth;
+  // Match CSS Grid's own `repeat(auto-fill, minmax(300px,1fr))` math, which
+  // floors rather than rounds — a column is only added once there's a full
+  // 300px+gap of room for it. Math.round previously let column widths dip
+  // just under 300px whenever the fit was e.g. 4.5 columns, cramming in an
+  // extra narrow column instead of keeping 4 comfortably-wide ones.
+  return Math.max(1, Math.floor((width + 18) / (300 + 18)));
 }
+
+let lastRenderedPresets = null;
+let lastPresetColumnCount = null;
+
+function renderPresetsGrid(presets){
+  lastRenderedPresets = presets;
+  const presetsGrid = document.getElementById('presetsGrid');
+  const numColumns = presetColumnCount();
+  lastPresetColumnCount = numColumns;
+  presetsGrid.innerHTML = '';
+
+  const columns = Array.from({length: numColumns}, () => {
+    const col = document.createElement('div');
+    col.className = 'presets-column';
+    presetsGrid.appendChild(col);
+    return col;
+  });
+
+  // Round-robin split: card 1 -> column 1, card 2 -> column 2, ... wrapping
+  // back to column 1 after the last column — matching the left-to-right,
+  // top-to-bottom reading order of the original grid layout. Each card is
+  // still permanently assigned to its column div: later height changes
+  // (like opening the "Other assets" dropdown) only ever push down cards
+  // further down that same column, never move cards into other columns.
+  presets.forEach((preset, i) => {
+    const columnIndex = i % numColumns;
+    columns[columnIndex].appendChild(buildPresetCard(preset));
+  });
+}
+
+// Only rebuild the grid when the number of columns actually needs to
+// change (e.g. resizing across the 900px breakpoint, or a big desktop
+// window resize) — not on every resize tick, and never as a side effect
+// of a card's own height changing.
+window.addEventListener('resize', () => {
+  if(!lastRenderedPresets) return;
+  const numColumns = presetColumnCount();
+  if(numColumns === lastPresetColumnCount) return;
+  renderPresetsGrid(lastRenderedPresets);
+});
 
 async function initPresets(){
   const loading = document.getElementById('presetsLoading');
