@@ -3225,10 +3225,26 @@ async function downloadPresetBundle(preset, btn){
     if(hasWallpapers){
       const wallpapersFolder = zip.folder('wallpapers');
       const results = await Promise.allSettled(
-        preset.wallpapers.map(async filename => {
+        preset.wallpapers.map(async (filename, index) => {
           const res = await fetch(fullWallpaperUrl(filename));
           if(!res.ok) throw new Error(`${filename} responded ${res.status}`);
-          wallpapersFolder.file(filename, await res.blob());
+
+          const blob = await res.blob();
+          const extension = filename.match(/\.[^.]+$/)?.[0] || '';
+
+          // The order in meta.json determines the role in the downloaded bundle:
+          // 1st wallpaper = desktop, 2nd wallpaper = lockscreen.
+          let outputName;
+          if(index === 0){
+            outputName = `desktop-wallpaper${extension}`;
+          }else if(index === 1){
+            outputName = `lockscreen-wallpaper${extension}`;
+          }else{
+            // Preserve the original filename for any additional wallpapers.
+            outputName = filename.split('/').pop();
+          }
+
+          zip.file(outputName, blob);
         })
       );
       results.forEach((r, i) => { if(r.status === 'rejected') missing.push(preset.wallpapers[i]); });
