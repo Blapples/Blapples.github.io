@@ -801,6 +801,46 @@
     align-self:flex-start;
   }
 
+  /* Collapsed-by-default dropdown for extra assets (banner, CI image) that
+     ship in the download but shouldn't clutter the card up front. */
+  .preset-extras{
+    margin-top:2px;
+  }
+  .preset-extras summary{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    cursor:pointer;
+    list-style:none;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    color:var(--md-on-surface-variant);
+    user-select:none;
+    transition:color .2s ease;
+  }
+  .preset-extras summary::-webkit-details-marker{display:none}
+  .preset-extras summary::before{
+    content:'';
+    width:6px;
+    height:6px;
+    flex:0 0 auto;
+    border-right:1.5px solid currentColor;
+    border-bottom:1.5px solid currentColor;
+    transform:rotate(-45deg);
+    transition:transform .2s var(--standard);
+  }
+  .preset-extras[open] summary::before{
+    transform:rotate(45deg);
+  }
+  .preset-extras summary:hover{
+    color:var(--md-on-surface);
+  }
+  .preset-extras .preset-linked-thumbs{
+    margin-top:8px;
+  }
+
   /* ---------- Preset image popup ---------- */
   .preset-lightbox-img{
     max-width:min(1100px,92vw);
@@ -2987,22 +3027,38 @@ async function fetchPresetsFromGitHub(src){
   // (an explicit meta.json "pfp" wins, otherwise anything with "pfp" or
   // "avatar" in its filename) so it doesn't get mixed in as a screenshot.
   function pickAssets(images, meta){
-    if(!images.length) return { main:null, extra:[], pfp:null };
+    if(!images.length) return { main:null, extra:[], pfp:null, banner:null, ciImage:null };
     const byName = f => images.find(img => img.filename.toLowerCase() === f.toLowerCase());
 
     const pfp =
       (meta.pfp && byName(meta.pfp)) ||
       images.find(img => /pfp|avatar/i.test(img.filename)) ||
       null;
-    const remaining = pfp ? images.filter(img => img !== pfp) : images;
 
-    if(!remaining.length) return { main:null, extra:[], pfp };
+    // Banner and CI (custom picture-used) images are pulled out the same
+    // way as the pfp — they're real assets that ship in the download, but
+    // they're tucked behind the "Other assets" dropdown on the card rather
+    // than shown as a screenshot or thumbnail up front.
+    const banner =
+      (meta.banner && byName(meta.banner)) ||
+      images.find(img => img !== pfp && /banner/i.test(img.filename)) ||
+      null;
+
+    const ciImage =
+      (meta.ciImage && byName(meta.ciImage)) ||
+      images.find(img => img !== pfp && img !== banner && /ci[-_]?image/i.test(img.filename)) ||
+      null;
+
+    const pulled = new Set([pfp, banner, ciImage].filter(Boolean));
+    const remaining = images.filter(img => !pulled.has(img));
+
+    if(!remaining.length) return { main:null, extra:[], pfp, banner, ciImage };
     const main =
       (meta.screenshot && byName(meta.screenshot)) ||
       remaining.find(img => /desktop/i.test(img.filename)) ||
       remaining[0];
     const extra = remaining.filter(img => img !== main);
-    return { main, extra, pfp };
+    return { main, extra, pfp, banner, ciImage };
   }
 
   const presets = await Promise.all(
@@ -3015,7 +3071,7 @@ async function fetchPresetsFromGitHub(src){
           if(metaRes.ok) meta = await metaRes.json();
         }catch(err){ /* meta is optional — fall back below */ }
       }
-      const { main, extra, pfp } = pickAssets(g.images, meta);
+      const { main, extra, pfp, banner, ciImage } = pickAssets(g.images, meta);
       if(!main) return null; // only had a pfp image, no actual screenshot — skip
       return {
         title: meta.title || titleFromFilename(folder),
@@ -3026,6 +3082,8 @@ async function fetchPresetsFromGitHub(src){
           label: /lock/i.test(img.filename) ? 'Lockscreen preview' : titleFromFilename(img.filename),
         })),
         pfp: pfp ? { url: presetRawUrl(pfp.path), filename: pfp.filename } : null,
+        banner: banner ? { url: presetRawUrl(banner.path), filename: banner.filename } : null,
+        ciImage: ciImage ? { url: presetRawUrl(ciImage.path), filename: ciImage.filename } : null,
         jsonUrl: presetRawUrl(g.jsonPath),
         jsonFilename: g.jsonFilename,
         wallpapers: Array.isArray(meta.wallpapers) ? meta.wallpapers : [],
@@ -3080,7 +3138,8 @@ async function downloadPresetJson(preset, btn){
 // linked wallpapers to bundle.
 async function downloadPresetBundle(preset, btn){
   const hasWallpapers = Array.isArray(preset.wallpapers) && preset.wallpapers.length > 0;
-  if(typeof JSZip === 'undefined' || (!hasWallpapers && !preset.pfp)){
+  const hasExtraFiles = !!preset.pfp || !!preset.banner || !!preset.ciImage;
+  if(typeof JSZip === 'undefined' || (!hasWallpapers && !hasExtraFiles)){
     return downloadPresetJson(preset, btn);
   }
 
@@ -3106,6 +3165,26 @@ async function downloadPresetBundle(preset, btn){
         zip.file(preset.pfp.filename, await pfpRes.blob());
       }catch(err){
         missing.push(preset.pfp.filename);
+      }
+    }
+
+    if(preset.banner){
+      try{
+        const bannerRes = await fetch(preset.banner.url);
+        if(!bannerRes.ok) throw new Error(`${preset.banner.filename} responded ${bannerRes.status}`);
+        zip.file(preset.banner.filename, await bannerRes.blob());
+      }catch(err){
+        missing.push(preset.banner.filename);
+      }
+    }
+
+    if(preset.ciImage){
+      try{
+        const ciRes = await fetch(preset.ciImage.url);
+        if(!ciRes.ok) throw new Error(`${preset.ciImage.filename} responded ${ciRes.status}`);
+        zip.file(preset.ciImage.filename, await ciRes.blob());
+      }catch(err){
+        missing.push(preset.ciImage.filename);
       }
     }
 
@@ -3291,8 +3370,54 @@ function buildPresetCard(preset){
     body.appendChild(groups);
   }
 
+  if(preset.banner || preset.ciImage){
+    const extras = document.createElement('details');
+    extras.className = 'preset-extras';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Other assets';
+    extras.appendChild(summary);
+
+    const extraThumbs = document.createElement('div');
+    extraThumbs.className = 'preset-linked-thumbs';
+
+    if(preset.banner){
+      const bannerBtn = document.createElement('button');
+      bannerBtn.type = 'button';
+      bannerBtn.className = 'preset-linked-thumb';
+      bannerBtn.setAttribute('aria-label', `View banner image used in ${preset.title}`);
+      bannerBtn.title = 'Banner image';
+      const bannerImg = document.createElement('img');
+      bannerImg.src = makePreviewUrl(preset.banner.url, 120);
+      bannerImg.alt = `${preset.title} banner image`;
+      bannerImg.loading = 'lazy';
+      bannerImg.decoding = 'async';
+      bannerBtn.appendChild(bannerImg);
+      bannerBtn.addEventListener('click', () => openPresetLightbox(preset.banner.url, `${preset.title} banner image`));
+      extraThumbs.appendChild(bannerBtn);
+    }
+
+    if(preset.ciImage){
+      const ciBtn = document.createElement('button');
+      ciBtn.type = 'button';
+      ciBtn.className = 'preset-linked-thumb';
+      ciBtn.setAttribute('aria-label', `View CI image used in ${preset.title}`);
+      ciBtn.title = 'CI image';
+      const ciImg = document.createElement('img');
+      ciImg.src = makePreviewUrl(preset.ciImage.url, 120);
+      ciImg.alt = `${preset.title} CI image`;
+      ciImg.loading = 'lazy';
+      ciImg.decoding = 'async';
+      ciBtn.appendChild(ciImg);
+      ciBtn.addEventListener('click', () => openPresetLightbox(preset.ciImage.url, `${preset.title} CI image`));
+      extraThumbs.appendChild(ciBtn);
+    }
+
+    extras.appendChild(extraThumbs);
+    body.appendChild(extras);
+  }
+
   const hasWallpapersForZip = Array.isArray(preset.wallpapers) && preset.wallpapers.length > 0;
-  const willZip = hasWallpapersForZip || !!preset.pfp;
+  const willZip = hasWallpapersForZip || !!preset.pfp || !!preset.banner || !!preset.ciImage;
   const downloadBtn = document.createElement('button');
   downloadBtn.type = 'button';
   downloadBtn.className = 'filled-btn preset-download-btn';
