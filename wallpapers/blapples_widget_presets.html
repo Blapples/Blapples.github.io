@@ -816,6 +816,9 @@
     border:1px solid var(--md-outline);
     cursor:pointer;
     flex:0 0 auto;
+    /* Neutral placeholder color, visible until the image loads and covers
+       it (object-fit:cover) or the broken-thumb fallback below takes over. */
+    background:var(--md-surface-container-high);
     transition:transform .25s var(--spring),border-color .25s ease;
   }
   .preset-linked-thumb:hover{
@@ -827,6 +830,59 @@
     height:100%;
     object-fit:cover;
     display:block;
+    /* Pop in rather than just appearing the instant the image finishes
+       loading - starts slightly scaled down and transparent, then eases
+       up to full size/opacity once `.is-loaded` lands (see
+       attachThumbLifecycle). Uses the same spring easing as the rest of
+       the site's hover/press motion so it feels consistent rather than
+       like a separate animation system. */
+    opacity:0;
+    transform:scale(.82);
+    transition:opacity .3s ease,transform .4s var(--spring);
+  }
+  .preset-linked-thumb.is-loaded img{
+    opacity:1;
+    transform:scale(1);
+  }
+  /* Gentle pulse on the placeholder background while a thumbnail is still
+     loading (thumbnails are `loading="lazy"`, so this can sit and pulse
+     for a while before one scrolls into view), so an empty thumbnail
+     slot reads as "loading" rather than "broken" or "forgotten". Cleared
+     once the image's `load` event fires (see attachThumbLifecycle) or if
+     it fails, in which case `.has-broken-thumb` below takes over instead.
+     `prefers-reduced-motion` is already handled globally (see the
+     `*,*::before,*::after{animation:none!important}` rule). */
+  @keyframes thumb-pulse{
+    0%,100%{opacity:1}
+    50%{opacity:.5}
+  }
+  .preset-linked-thumb:not(.is-loaded):not(.has-broken-thumb){
+    animation:thumb-pulse 1.4s ease-in-out infinite;
+  }
+  /* Thumbnails load from GitHub + an external image proxy - either can
+     legitimately be down, rate-limited, or blocked by an ad-blocker. When
+     that happens the bare <img> would otherwise show the browser's default
+     broken-image glyph plus its (often long) alt text wrapped and clipped
+     inside a 52px box - unreadable and looks like the site is broken.
+     .is-broken (set by JS on the image's error event) swaps that for a
+     plain neutral tile with a small icon instead. */
+  .preset-linked-thumb img.is-broken{
+    opacity:0;
+  }
+  .preset-linked-thumb.has-broken-thumb{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .preset-linked-thumb.has-broken-thumb::after{
+    content:'';
+    width:18px;
+    height:18px;
+    flex-shrink:0;
+    background:var(--md-on-surface-variant);
+    opacity:.55;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E") center/contain no-repeat;
   }
   .preset-download-btn{
     margin-top:6px;
@@ -2998,6 +3054,45 @@ function rawWallpaperUrl(filename){
   return `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${filename.split('/').map(encodeURIComponent).join('/')}`;
 }
 
+// Thumbnails load from GitHub + an external image proxy, either of which can
+// legitimately fail (rate limiting, downtime, an ad-blocker). This wires up
+// both ends of that: a pulsing placeholder (`.preset-linked-thumb`'s base
+// CSS) while it's in flight, `.is-loaded` to clear the pulse once the image
+// actually renders, and `.has-broken-thumb` for a clean icon fallback if it
+// never does - seethe `.has-broken-thumb` CSS this pairs with for the
+// broken-image glyph + raw alt text a bare <img> would otherwise show.
+function attachThumbLifecycle(img, thumbEl){
+  img.addEventListener('load', () => {
+    thumbEl.classList.add('is-loaded');
+  }, { once: true });
+  img.addEventListener('error', () => {
+    img.classList.add('is-broken');
+    thumbEl.classList.add('has-broken-thumb');
+    // Right now hovering a failed thumb just repeats its original label
+    // ("Ahri Splash Art 2023"), which reads as if that's genuinely what's
+    // there rather than admitting it didn't load - misleading rather than
+    // helpful. Note the failure directly, in the same plain, calm register
+    // as the rest of the site's copy ("These files couldn't be fetched...",
+    // "No presets up yet — check back soon.").
+    thumbEl.title = "Couldn't load - try again later";
+    const label = thumbEl.getAttribute('aria-label');
+    if(label) thumbEl.setAttribute('aria-label', `${label} (couldn't load)`);
+  }, { once: true });
+}
+
+// Wallpaper thumbnails are keyed by their raw filename (e.g.
+// "wallpapers/ahri-splash_2023.png"), which is fine as a href/lookup key but
+// reads poorly as a title/aria-label. Strip the folder path and extension,
+// swap separators for spaces, and title-case it for something a screen
+// reader or tooltip can actually present as a name.
+function friendlyWallpaperName(filename){
+  const base = filename.split('/').pop().replace(/\.[a-z0-9]+$/i, '');
+  const spaced = base.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if(!spaced) return filename;
+  return spaced.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+
 /* ---------- Widget Presets ----------
    Same drop-in-a-file idea as the wallpaper repo: create a GitHub repo (or
    reuse this one with a subfolder) where each preset is its own SUBFOLDER,
@@ -3161,6 +3256,48 @@ function fullWallpaperUrl(filename){
   return rawWallpaperUrl(filename);
 }
 
+// A small handful of colored pieces launched from the Download button on a
+// successful save (CSS shell for `.confetti-piece` already existed; this is
+// the JS that actually drives it - see the "Confetti burst" comment block
+// near .confetti-piece for the intended design). Reuses the same rainbow
+// already used for the "all colors" filter chip swatch elsewhere on the
+// page, so the palette feels native to the site rather than a random extra.
+const CONFETTI_COLORS = ['#e0483e','#e08a3e','#e0c93e','#6cbf5c','#4c7fe0','#8a5ce0'];
+
+function fireConfetti(originEl){
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const rect = originEl.getBoundingClientRect();
+  const originX = rect.left + rect.width / 2;
+  const originY = rect.top + rect.height * 0.35; // a bit above center, closer to the icon/label
+
+  const pieceCount = 16;
+  for(let i = 0; i < pieceCount; i++){
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece' + (Math.random() < 0.5 ? ' is-round' : '');
+    piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+    piece.style.left = `${originX}px`;
+    piece.style.top = `${originY}px`;
+    document.body.appendChild(piece);
+
+    // Radial burst, biased upward, with a little extra downward drift added
+    // at the end of the flight so pieces read as "falling" rather than just
+    // stopping in mid-air.
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 55 + Math.random() * 85;
+    const dx = Math.cos(angle) * distance;
+    const dy = Math.sin(angle) * distance - 50;
+    const rotation = (Math.random() - 0.5) * 720;
+    const duration = 650 + Math.random() * 450;
+
+    const anim = piece.animate([
+      { transform:'translate(-50%,-50%) translate(0,0) rotate(0deg)', opacity:1 },
+      { transform:`translate(-50%,-50%) translate(${dx * 0.7}px,${dy}px) rotate(${rotation * 0.6}deg)`, opacity:1, offset:0.55 },
+      { transform:`translate(-50%,-50%) translate(${dx}px,${dy + 90}px) rotate(${rotation}deg)`, opacity:0 },
+    ], { duration, easing:'cubic-bezier(.2,.6,.35,1)', fill:'forwards' });
+    anim.onfinish = () => piece.remove();
+  }
+}
+
 async function downloadPresetJson(preset, btn){
   const label = btn.querySelector('.preset-download-label');
   const originalLabel = label ? label.textContent : '';
@@ -3178,6 +3315,7 @@ async function downloadPresetJson(preset, btn){
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     if(label){
       btn.classList.add('is-success');
+      fireConfetti(btn);
       label.textContent = 'Downloaded!';
       setTimeout(() => { btn.classList.remove('is-success'); label.textContent = originalLabel; }, 1800);
     }
@@ -3275,6 +3413,7 @@ async function downloadPresetBundle(preset, btn){
     setTimeout(() => URL.revokeObjectURL(url), 10000);
 
     btn.classList.add('is-success');
+    fireConfetti(btn);
     setLabel(missing.length ? 'Downloaded (some files missing)' : 'Downloaded!');
     setTimeout(() => { btn.classList.remove('is-success'); setLabel(originalLabel); }, 2400);
   }catch(err){
@@ -3403,6 +3542,55 @@ function setupPresetExtras(details, bodyEl){
   }
 }
 
+// Cursor-following 3D tilt on the screenshot preview, layered on top of the
+// existing hover zoom (see .preset-screenshot-btn:hover .preset-screenshot
+// in CSS) rather than replacing it - `scale(1.04)` is baked into the same
+// transform this applies. Desktop-with-a-real-cursor only (same
+// hover:hover/pointer:fine gate the "hover to preview" feature elsewhere
+// uses) since a tilt that tracks touches would just feel sticky/broken on
+// mobile, and reduced-motion opts out entirely since it's pure flourish.
+const SUPPORTS_HOVER_TILT = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function attachScreenshotTilt(btn, img){
+  if(!SUPPORTS_HOVER_TILT) return;
+  const MAX_TILT_DEG = 7;
+  let queued = false;
+  let nextRx = 0;
+  let nextRy = 0;
+
+  function paint(){
+    queued = false;
+    img.style.transform = `perspective(700px) rotateX(${nextRx}deg) rotateY(${nextRy}deg) scale(1.04)`;
+  }
+
+  btn.addEventListener('mouseenter', () => {
+    // No transition while actively tracking the cursor - a smoothing
+    // transition here would make the tilt visibly lag a beat behind the
+    // mouse instead of feeling directly manipulated.
+    img.style.transition = 'transform .15s ease-out';
+  });
+
+  btn.addEventListener('mousemove', (e) => {
+    const rect = btn.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width;
+    const py = (e.clientY - rect.top) / rect.height;
+    nextRy = (px - 0.5) * MAX_TILT_DEG * 2;
+    nextRx = (0.5 - py) * MAX_TILT_DEG * 2;
+    if(!queued){
+      queued = true;
+      requestAnimationFrame(paint);
+    }
+  });
+
+  btn.addEventListener('mouseleave', () => {
+    // Ease back to flat/neutral on the way out - this is the one moment a
+    // transition should be visible.
+    img.style.transition = 'transform .45s var(--spring)';
+    img.style.transform = '';
+  });
+}
+
 function buildPresetCard(preset){
   const card = document.createElement('article');
   card.className = 'preset-card';
@@ -3419,6 +3607,7 @@ function buildPresetCard(preset){
   shotImg.decoding = 'async';
   shotBtn.appendChild(shotImg);
   shotBtn.addEventListener('click', () => openPresetLightbox(preset.screenshot, `${preset.title} preview`));
+  attachScreenshotTilt(shotBtn, shotImg);
 
   const body = document.createElement('div');
   body.className = 'preset-body';
@@ -3479,6 +3668,7 @@ function buildPresetCard(preset){
         thumbImg.alt = shot.label;
         thumbImg.loading = 'lazy';
         thumbImg.decoding = 'async';
+        attachThumbLifecycle(thumbImg, thumbBtn);
         thumbBtn.appendChild(thumbImg);
         thumbBtn.addEventListener('click', () => openPresetLightbox(shot.url, shot.label));
         thumbs.appendChild(thumbBtn);
@@ -3503,13 +3693,15 @@ function buildPresetCard(preset){
         thumbLink.href = `index.html?wallpaper=${encodeURIComponent(filename)}`;
         thumbLink.target = '_blank';
         thumbLink.rel = 'noopener';
-        thumbLink.setAttribute('aria-label', `Open ${filename} in the wallpaper collection`);
-        thumbLink.title = filename;
+        const friendlyName = friendlyWallpaperName(filename);
+        thumbLink.setAttribute('aria-label', `Open ${friendlyName} in the wallpaper collection`);
+        thumbLink.title = friendlyName;
         const thumbImg = document.createElement('img');
         thumbImg.src = makePreviewUrl(rawWallpaperUrl(filename), 120);
-        thumbImg.alt = filename;
+        thumbImg.alt = friendlyName;
         thumbImg.loading = 'lazy';
         thumbImg.decoding = 'async';
+        attachThumbLifecycle(thumbImg, thumbLink);
         thumbLink.appendChild(thumbImg);
         thumbs.appendChild(thumbLink);
       });
@@ -3541,6 +3733,7 @@ function buildPresetCard(preset){
       bannerImg.alt = `${preset.title} banner image`;
       bannerImg.loading = 'lazy';
       bannerImg.decoding = 'async';
+      attachThumbLifecycle(bannerImg, bannerBtn);
       bannerBtn.appendChild(bannerImg);
       bannerBtn.addEventListener('click', () => openPresetLightbox(preset.banner.url, `${preset.title} banner image`));
       extraThumbs.appendChild(bannerBtn);
@@ -3557,6 +3750,7 @@ function buildPresetCard(preset){
       ciImg.alt = `${preset.title} CI image`;
       ciImg.loading = 'lazy';
       ciImg.decoding = 'async';
+      attachThumbLifecycle(ciImg, ciBtn);
       ciBtn.appendChild(ciImg);
       ciBtn.addEventListener('click', () => openPresetLightbox(preset.ciImage.url, `${preset.title} CI image`));
       extraThumbs.appendChild(ciBtn);
