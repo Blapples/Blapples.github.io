@@ -3157,9 +3157,10 @@ function friendlyWallpaperName(filename){
    half-uploaded folder never shows up broken).
 
    Downloading a preset zips everything into one bundle: a single assets/
-   folder inside the zip holding preset.json itself alongside the
-   screenshots, avatar, banner image, custom image, and the linked
-   wallpapers together. */
+   folder inside the zip holding preset.json itself alongside the avatar,
+   banner image, custom image, and the linked wallpapers together.
+   Screenshots are only for the website's preview cards and aren't
+   included in the download. */
 const PRESETS_SOURCE = {
   user:   'Blapples',
   repo:   'wallpapers',
@@ -3418,9 +3419,10 @@ async function downloadPresetJson(preset, btn){
 
 // Bundles the preset .json together with every asset it uses into one
 // .zip: a single assets/ folder holding preset.json itself alongside the
-// screenshots, avatar, banner image, custom image, and every linked
-// wallpaper (full resolution, not the small preview). Falls back to a
-// plain .json download if JSZip failed to load.
+// avatar, banner image, custom image, and every linked wallpaper (full
+// resolution, not the small preview). Screenshots are for the website's
+// preview cards only and are intentionally left out of the download.
+// Falls back to a plain .json download if JSZip failed to load.
 async function downloadPresetBundle(preset, btn){
   if(typeof JSZip === 'undefined'){
     return downloadPresetJson(preset, btn);
@@ -3460,10 +3462,6 @@ async function downloadPresetBundle(preset, btn){
       }
     }
 
-    await addAsset(preset.screenshot, preset.screenshotFilename);
-    for(const shot of preset.extraScreenshots || []){
-      await addAsset(shot.url, shot.filename);
-    }
     if(preset.avatar) await addAsset(preset.avatar.url, preset.avatar.filename);
     if(preset.banner) await addAsset(preset.banner.url, preset.banner.filename);
     if(preset.customImage) await addAsset(preset.customImage.url, preset.customImage.filename);
@@ -3850,8 +3848,9 @@ function buildPresetCard(preset){
     setupPresetExtras(extras, extrasBody);
   }
 
-  // Every download now bundles preset.json plus an assets/ folder (at
-  // minimum the main screenshot), so the button always advertises the zip.
+  // Every download now bundles preset.json plus an assets/ folder
+  // (avatar/banner/customImage/wallpapers, when present), so the button
+  // always advertises the zip.
   const willZip = true;
   const downloadBtn = document.createElement('button');
   downloadBtn.type = 'button';
