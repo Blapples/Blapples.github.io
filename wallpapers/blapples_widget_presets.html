@@ -3111,8 +3111,8 @@ function friendlyWallpaperName(filename){
      presets/<preset-name>/
        preset.json           <- the actual widget preset, offered as the download
        meta.json              <- (optional) title/description + asset mapping
-       screenshot-desktop.png
-       screenshot-lock.png
+       preview.png             <- main/desktop preview (fixed name, see below)
+       preview-lock.png        <- lockscreen preview (fixed name, see below)
        avatar.png
        banner-image.png
        custom-image.png
@@ -3126,6 +3126,13 @@ function friendlyWallpaperName(filename){
    from the wallpapers repo by filename (via meta.json's "wallpapers"
    list), same as before.
 
+   Naming convention: two fixed filenames are reserved so any external tool
+   reading this repo's raw files directly (not just this website) can find
+   the right image without parsing meta.json at all:
+     - "preview.<ext>"      — the main/desktop preview
+     - "preview-lock.<ext>" — the lockscreen preview
+   meta.json's "preview"/"screenshots" fields still override these if set.
+
    meta.json (optional) fields:
      {
        "title": "...",
@@ -3133,6 +3140,8 @@ function friendlyWallpaperName(filename){
        "preview": "screenshot-desktop.png",   // which assets/ image is the
                                                // main preview shown on the
                                                // card. Falls back to a
+                                               // file literally named
+                                               // "preview.<ext>", then a
                                                // filename containing
                                                // "desktop", then whatever's
                                                // first, if omitted.
@@ -3166,9 +3175,11 @@ function friendlyWallpaperName(filename){
 
    Downloading a preset zips everything into one bundle: a single assets/
    folder inside the zip holding preset.json itself alongside the avatar,
-   banner image, custom image, and the linked wallpapers together.
-   Screenshots are only for the website's preview cards and aren't
-   included in the download. */
+   banner image, custom image, the linked wallpapers, and the main preview
+   screenshot (shipped as a fixed "preview.<ext>" filename so tools reading
+   the bundle - e.g. a quickshell config - can find it deterministically
+   instead of guessing at one of the other bundled images). Secondary/
+   extra screenshots are still website-preview-only and aren't bundled. */
 const PRESETS_SOURCE = {
   user:   'Blapples',
   repo:   'wallpapers',
@@ -3251,8 +3262,11 @@ async function fetchPresetsFromGitHub(src){
   // banner, custom image, main preview, and secondary previews. An
   // explicit meta.json filename wins for each slot; otherwise avatar/
   // banner/customImage fall back to matching filenames, and the main
-  // preview falls back to a filename containing "desktop", then whatever's
-  // left over first.
+  // preview falls back to a file literally named "preview.<ext>" (the
+  // convention for this repo — kept so any external tool reading the raw
+  // repo directly, not just this site, can find the same file
+  // deterministically), then a filename containing "desktop", then
+  // whatever's left over first.
   function pickAssets(assets, meta){
     if(!assets.length) return { main:null, extra:[], avatar:null, banner:null, customImage:null };
     const byName = f => assets.find(a => a.filename.toLowerCase() === f.toLowerCase());
@@ -3289,6 +3303,7 @@ async function fetchPresetsFromGitHub(src){
     if(!remaining.length) return { main:null, extra:[], avatar, banner, customImage };
     const main =
       (meta.preview && byName(meta.preview)) ||
+      remaining.find(a => /^preview\.[a-z0-9]+$/i.test(a.filename)) ||
       remaining.find(a => /desktop/i.test(a.filename)) ||
       remaining[0];
     const extra = remaining.filter(a => a !== main);
@@ -3436,10 +3451,11 @@ async function downloadPresetJson(preset, btn){
 }
 
 // Bundles the preset .json together with every asset it uses into one
-// .zip: a single assets/ folder holding preset.json itself alongside the
-// avatar, banner image, custom image, and every linked wallpaper (full
-// resolution, not the small preview). Screenshots are for the website's
-// preview cards only and are intentionally left out of the download.
+// .zip: a single assets/ folder holding preset.json itself alongside a
+// fixed-name "preview.<ext>" copy of the main screenshot, the avatar,
+// banner image, custom image, and every linked wallpaper (full
+// resolution, not the small preview). Only secondary/extra screenshots
+// stay website-preview-only and are left out of the download.
 // Falls back to a plain .json download if JSZip failed to load.
 async function downloadPresetBundle(preset, btn){
   if(typeof JSZip === 'undefined'){
@@ -3480,6 +3496,26 @@ async function downloadPresetBundle(preset, btn){
       }
     }
 
+    if(preset.screenshot){
+      // Ship the main preview under a filename-agnostic, fixed name so a
+      // consumer of the bundle (e.g. a quickshell config linking to these
+      // presets) can find "the" preview deterministically instead of
+      // picking randomly among whatever else happens to be in assets/ -
+      // that's what was happening when this was left out of the zip.
+      const extMatch = (preset.screenshotFilename || '').match(/\.[a-z0-9]+$/i);
+      const previewFilename = `preview${extMatch ? extMatch[0] : '.png'}`;
+      await addAsset(preset.screenshot, previewFilename);
+    }
+    // Same deal for the lockscreen preview, if this preset has one - ships
+    // under the matching fixed "preview-lock.<ext>" name.
+    const lockScreenshot = Array.isArray(preset.extraScreenshots)
+      ? preset.extraScreenshots.find(s => /lock/i.test(s.filename))
+      : null;
+    if(lockScreenshot){
+      const lockExtMatch = lockScreenshot.filename.match(/\.[a-z0-9]+$/i);
+      const previewLockFilename = `preview-lock${lockExtMatch ? lockExtMatch[0] : '.png'}`;
+      await addAsset(lockScreenshot.url, previewLockFilename);
+    }
     if(preset.avatar) await addAsset(preset.avatar.url, preset.avatar.filename);
     if(preset.banner) await addAsset(preset.banner.url, preset.banner.filename);
     if(preset.customImage) await addAsset(preset.customImage.url, preset.customImage.filename);
