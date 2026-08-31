@@ -3152,9 +3152,11 @@ function friendlyWallpaperName(filename){
                                                // after preview/avatar/
                                                // banner/customImage becomes
                                                // a secondary preview.
-       "avatar": "avatar.png",                // exact filename in assets/
-       "banner": "banner-image.png",          // exact filename in assets/
-       "customImage": "custom-image.png",     // exact filename in assets/
+       "avatar": "avatar.png",                // exact filename in assets/,
+                                               // or any filename from the
+                                               // wallpaper collection
+       "banner": "banner-image.png",          // same as avatar
+       "customImage": "custom-image.png",     // same as avatar
        "wallpapers": ["some-wallpaper.png"]   // filenames from the
                                                // wallpapers repo, fetched
                                                // (not uploaded) at download
@@ -3162,11 +3164,11 @@ function friendlyWallpaperName(filename){
      }
      "avatar", "banner", and "customImage" are each optional and, if
      omitted, fall back to matching a filename containing "avatar"/"pfp",
-     "banner", or "custom-image"/"ci-image" respectively. Any of the three
-     can also just name one of the filenames already listed in
-     "wallpapers" instead of a separate file in the preset folder — no
-     need to upload a duplicate copy if the banner (say) is one of the
-     wallpapers already linked to this preset.
+     "banner", or "custom-image"/"ci-image" respectively (checked against
+     files in the preset's own folder only). If given explicitly, each can
+     instead name any filename that exists in the wallpaper collection - it
+     doesn't need to be one of this preset's own "wallpapers" too, and
+     doesn't need a duplicate copy uploaded into the preset folder.
 
    If meta.json is missing entirely, the title is derived from the folder
    name and every asset is matched by filename convention. A folder missing
@@ -3326,15 +3328,19 @@ async function fetchPresetsFromGitHub(src){
       const wallpapers = Array.isArray(meta.wallpapers) ? meta.wallpapers : [];
 
       // avatar/banner/customImage normally live as their own file inside the
-      // preset's own folder. But if meta.json points one of them at a
-      // filename that's actually one of this preset's linked wallpapers
-      // instead, there's no need to duplicate that file into the preset
-      // folder too — resolve it straight from the wallpapers repo.
+      // preset's own folder. But meta.json can instead point one of them at
+      // a filename from the wallpaper collection - no need to duplicate
+      // that file into the preset folder. It doesn't have to be one of
+      // this preset's own linked "wallpapers" either; any filename that
+      // exists in the wallpaper collection works (this preset's own
+      // wallpapers list is just checked first, so the casing already typed
+      // there is reused when it matches).
       function resolveImage(local, metaField){
         if(local) return { url: presetRawUrl(local.path), filename: local.filename };
-        const wpMatch = metaField && wallpapers.find(w => w.toLowerCase() === metaField.toLowerCase());
-        if(wpMatch) return { url: rawWallpaperUrl(wpMatch), filename: wpMatch, fromWallpaper: true };
-        return null;
+        if(!metaField) return null;
+        const wpMatch = wallpapers.find(w => w.toLowerCase() === metaField.toLowerCase());
+        const filename = wpMatch || metaField;
+        return { url: rawWallpaperUrl(filename), filename, fromWallpaper: true };
       }
 
       return {
