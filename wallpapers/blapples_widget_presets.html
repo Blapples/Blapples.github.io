@@ -1466,6 +1466,14 @@
     100%{transform:scale(1)}
   }
 
+  /* ---------- Download failure state ----------
+     Mirrors .is-success but red-tinted and without the bounce/confetti -
+     shown when the preset fetch fails, instead of silently opening a
+     broken raw.githubusercontent.com URL in a new tab. */
+  .filled-btn.is-error{
+    background:color-mix(in srgb,var(--md-primary) 55%,#e0483e 45%);
+  }
+
   /* ---------- Confetti burst ----------
      A small handful of colored pieces launched from the Download button on
      a successful save. Purely decorative: position/rotation/opacity are
@@ -3393,7 +3401,7 @@ async function downloadPresetJson(preset, btn){
   const label = btn.querySelector('.preset-download-label');
   const originalLabel = label ? label.textContent : '';
   try{
-    const response = await fetch(preset.jsonUrl, { cache:'force-cache' });
+    const response = await fetch(preset.jsonUrl, { cache:'default' });
     if(!response.ok) throw new Error(`Responded ${response.status}`);
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
@@ -3411,9 +3419,19 @@ async function downloadPresetJson(preset, btn){
       setTimeout(() => { btn.classList.remove('is-success'); label.textContent = originalLabel; }, 1800);
     }
   }catch(err){
-    // CORS or a network hiccup on the JSON host — fall back to opening the
-    // raw file directly so the click still does something useful.
-    window.open(preset.jsonUrl, '_blank', 'noopener');
+    // The fetch genuinely failed (bad status, CORS, network hiccup). The
+    // old behavior here was to window.open(preset.jsonUrl), but that just
+    // sends the visitor to the exact URL that already failed - for a
+    // raw.githubusercontent.com 400/404 that means dumping them on a bare
+    // GitHub error page in a new tab with zero context. Fail in place
+    // instead: log the real URL + reason so it's actually debuggable, and
+    // surface the failure on the button itself rather than navigating away.
+    console.error(`Preset download failed for "${preset.title}": ${err.message}\nURL: ${preset.jsonUrl}`);
+    if(label){
+      btn.classList.add('is-error');
+      label.textContent = "Couldn't download - try again later";
+      setTimeout(() => { btn.classList.remove('is-error'); label.textContent = originalLabel; }, 2400);
+    }
   }
 }
 
