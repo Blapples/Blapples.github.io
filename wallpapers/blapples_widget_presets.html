@@ -3098,22 +3098,64 @@ function friendlyWallpaperName(filename){
    reuse this one with a subfolder) where each preset is its own SUBFOLDER,
    and it just shows up here — no code changes needed.
 
-   Each preset folder needs:
-     - one .json file   -> the actual widget preset, offered as the download
-     - one or more images (.png/.jpg/.jpeg/.webp) -> screenshots. If more
-       than one, the one with "desktop" in its filename becomes the main
-       preview and the rest show as small secondary previews.
-     - meta.json (optional) -> { "title", "description", "wallpapers": [...],
-       "screenshot": "exact-filename.png" }
-       "wallpapers" is an array of filenames EXACTLY as they appear in the
-       wallpapers repo — those render as small thumbnails that link back to
-       that specific wallpaper on the main collection page.
-       "screenshot" lets you explicitly pick the main preview image instead
-       of relying on the "desktop" naming convention.
+   Each preset folder looks like:
 
-   If meta.json is missing, the title is derived from the folder name. A
-   folder missing either the .json or an image is skipped entirely (so a
-   half-uploaded folder never shows up broken). */
+     presets/<preset-name>/
+       preset.json           <- the actual widget preset, offered as the download
+       meta.json              <- (optional) title/description + asset mapping
+       screenshot-desktop.png
+       screenshot-lock.png
+       avatar.png
+       banner-image.png
+       custom-image.png
+
+   Every image you provide (screenshots, avatar, banner image, custom image)
+   goes right in the preset's own folder alongside preset.json and
+   meta.json — that's the one place to drop files for a preset. An
+   `assets/` subfolder inside the preset folder also works if you'd rather
+   organize it that way, but it isn't required. Wallpapers are the one
+   exception: those aren't uploaded here at all, they're still fetched live
+   from the wallpapers repo by filename (via meta.json's "wallpapers"
+   list), same as before.
+
+   meta.json (optional) fields:
+     {
+       "title": "...",
+       "description": "...",
+       "preview": "screenshot-desktop.png",   // which assets/ image is the
+                                               // main preview shown on the
+                                               // card. Falls back to a
+                                               // filename containing
+                                               // "desktop", then whatever's
+                                               // first, if omitted.
+       "screenshots": ["screenshot-lock.png"], // optional explicit list of
+                                               // secondary previews (in
+                                               // order). If omitted, every
+                                               // assets/ image left over
+                                               // after preview/avatar/
+                                               // banner/customImage becomes
+                                               // a secondary preview.
+       "avatar": "avatar.png",                // exact filename in assets/
+       "banner": "banner-image.png",          // exact filename in assets/
+       "customImage": "custom-image.png",     // exact filename in assets/
+       "wallpapers": ["some-wallpaper.png"]   // filenames from the
+                                               // wallpapers repo, fetched
+                                               // (not uploaded) at download
+                                               // time
+     }
+     "avatar", "banner", and "customImage" are each optional and, if
+     omitted, fall back to matching a filename containing "avatar"/"pfp",
+     "banner", or "custom-image"/"ci-image" respectively.
+
+   If meta.json is missing entirely, the title is derived from the folder
+   name and every asset is matched by filename convention. A folder missing
+   either the preset .json or any assets/ image is skipped entirely (so a
+   half-uploaded folder never shows up broken).
+
+   Downloading a preset zips everything into one bundle: a single assets/
+   folder inside the zip holding preset.json itself alongside the
+   screenshots, avatar, banner image, custom image, and the linked
+   wallpapers together. */
 const PRESETS_SOURCE = {
   user:   'Blapples',
   repo:   'wallpapers',
@@ -3144,10 +3186,16 @@ async function fetchPresetsFromGitHub(src){
 
   const prefix = path ? `${path.replace(/\/$/, '')}/` : '';
   const imageExt = /\.(png|jpe?g|webp)$/i;
+  const assetsPrefix = 'assets/';
 
   // Group every file by its immediate subfolder under `prefix` — that
-  // subfolder IS the preset. Files sitting directly in `prefix` (not
-  // inside a folder) are ignored, same as nested sub-subfolders.
+  // subfolder IS the preset. Within a preset's own folder, what's read is:
+  // .json files sitting directly in it (the preset + meta.json), and image
+  // files — which in practice sit right there in the preset's own folder
+  // alongside the .json files (that's how every preset in the repo is
+  // actually laid out). An `assets/` subfolder is also supported for
+  // images, in case a preset is organized that way instead. Anything nested
+  // deeper than that is ignored.
   const groups = new Map();
   for(const entry of data.tree){
     if(entry.type !== 'blob') continue;
@@ -3156,66 +3204,87 @@ async function fetchPresetsFromGitHub(src){
     const slashIdx = rel.indexOf('/');
     if(slashIdx === -1) continue;
     const folder = rel.slice(0, slashIdx);
-    const filename = rel.slice(slashIdx + 1);
-    if(filename.includes('/')) continue; // only one level deep
-    if(!groups.has(folder)) groups.set(folder, { images: [] });
+    const rel2 = rel.slice(slashIdx + 1); // path within the preset's own folder
+    if(!groups.has(folder)) groups.set(folder, { assets: [] });
     const g = groups.get(folder);
+
+    if(rel2.startsWith(assetsPrefix)){
+      const assetRel = rel2.slice(assetsPrefix.length);
+      if(!assetRel.includes('/') && imageExt.test(assetRel)){
+        // A preset can have more than one screenshot (desktop + lockscreen,
+        // etc) alongside avatar/banner/custom images — keep them all, we
+        // sort out which is which below.
+        g.assets.push({ path: entry.path, filename: assetRel });
+      }
+      continue;
+    }
+    if(rel2.includes('/')) continue; // any other nested folder, ignore
+
+    const filename = rel2;
     if(filename.toLowerCase() === 'meta.json'){
-      g.metaPath = prefix + rel;
+      g.metaPath = entry.path;
     } else if(/\.json$/i.test(filename)){
-      g.jsonPath = prefix + rel;
+      g.jsonPath = entry.path;
       g.jsonFilename = filename;
     } else if(imageExt.test(filename)){
-      // A folder can have more than one screenshot (desktop + lockscreen,
-      // etc) — keep them all, we pick the primary one below.
-      g.images.push({ path: prefix + rel, filename });
+      // Image sitting directly in the preset's own folder (screenshot,
+      // avatar, banner, custom image, etc) — this is how every preset in
+      // the repo actually stores its images.
+      g.assets.push({ path: entry.path, filename });
     }
   }
 
-  // Given a folder's collected images, pick the "main" screenshot: an
-  // explicit meta.json filename wins, then anything with "desktop" in its
-  // name, then whatever's first. Everything else becomes secondary
-  // previews — except the profile picture, which is pulled out on its own
-  // (an explicit meta.json "pfp" wins, otherwise anything with "pfp" or
-  // "avatar" in its filename) so it doesn't get mixed in as a screenshot.
-  function pickAssets(images, meta){
-    if(!images.length) return { main:null, extra:[], pfp:null, banner:null, ciImage:null };
-    const byName = f => images.find(img => img.filename.toLowerCase() === f.toLowerCase());
+  // Given a preset's collected assets/ images, sort them into avatar,
+  // banner, custom image, main preview, and secondary previews. An
+  // explicit meta.json filename wins for each slot; otherwise avatar/
+  // banner/customImage fall back to matching filenames, and the main
+  // preview falls back to a filename containing "desktop", then whatever's
+  // left over first.
+  function pickAssets(assets, meta){
+    if(!assets.length) return { main:null, extra:[], avatar:null, banner:null, customImage:null };
+    const byName = f => assets.find(a => a.filename.toLowerCase() === f.toLowerCase());
 
-    const pfp =
-      (meta.pfp && byName(meta.pfp)) ||
-      images.find(img => /pfp|avatar/i.test(img.filename)) ||
+    const avatar =
+      (meta.avatar && byName(meta.avatar)) ||
+      assets.find(a => /avatar|pfp/i.test(a.filename)) ||
       null;
 
-    // Banner and CI (custom picture-used) images are pulled out the same
-    // way as the pfp — they're real assets that ship in the download, but
-    // they're tucked behind the "Other assets" dropdown on the card rather
-    // than shown as a screenshot or thumbnail up front.
+    // Banner and custom images are pulled out the same way as the avatar —
+    // they're real assets that ship in the download, but they're tucked
+    // behind the "Other assets" dropdown on the card rather than shown as
+    // a screenshot or thumbnail up front.
     const banner =
       (meta.banner && byName(meta.banner)) ||
-      images.find(img => img !== pfp && /banner/i.test(img.filename)) ||
+      assets.find(a => a !== avatar && /banner/i.test(a.filename)) ||
       null;
 
-    const ciImage =
-      (meta.ciImage && byName(meta.ciImage)) ||
-      images.find(img => img !== pfp && img !== banner && /ci[-_]?image/i.test(img.filename)) ||
+    const customImage =
+      (meta.customImage && byName(meta.customImage)) ||
+      assets.find(a => a !== avatar && a !== banner && /custom[-_]?image|ci[-_]?image/i.test(a.filename)) ||
       null;
 
-    const pulled = new Set([pfp, banner, ciImage].filter(Boolean));
-    const remaining = images.filter(img => !pulled.has(img));
+    const pulled = new Set([avatar, banner, customImage].filter(Boolean));
+    let remaining = assets.filter(a => !pulled.has(a));
 
-    if(!remaining.length) return { main:null, extra:[], pfp, banner, ciImage };
+    // An explicit meta.json "screenshots" list picks (and orders) the
+    // secondary previews from what's left over.
+    if(Array.isArray(meta.screenshots) && meta.screenshots.length){
+      const named = meta.screenshots.map(byName).filter(Boolean);
+      if(named.length) remaining = named;
+    }
+
+    if(!remaining.length) return { main:null, extra:[], avatar, banner, customImage };
     const main =
-      (meta.screenshot && byName(meta.screenshot)) ||
-      remaining.find(img => /desktop/i.test(img.filename)) ||
+      (meta.preview && byName(meta.preview)) ||
+      remaining.find(a => /desktop/i.test(a.filename)) ||
       remaining[0];
-    const extra = remaining.filter(img => img !== main);
-    return { main, extra, pfp, banner, ciImage };
+    const extra = remaining.filter(a => a !== main);
+    return { main, extra, avatar, banner, customImage };
   }
 
   const presets = await Promise.all(
     Array.from(groups.entries()).map(async ([folder, g]) => {
-      if(!g.jsonPath || !g.images.length) return null; // incomplete, skip
+      if(!g.jsonPath || !g.assets.length) return null; // incomplete, skip
       let meta = {};
       if(g.metaPath){
         try{
@@ -3223,19 +3292,21 @@ async function fetchPresetsFromGitHub(src){
           if(metaRes.ok) meta = await metaRes.json();
         }catch(err){ /* meta is optional — fall back below */ }
       }
-      const { main, extra, pfp, banner, ciImage } = pickAssets(g.images, meta);
-      if(!main) return null; // only had a pfp image, no actual screenshot — skip
+      const { main, extra, avatar, banner, customImage } = pickAssets(g.assets, meta);
+      if(!main) return null; // only had e.g. an avatar image, no actual screenshot — skip
       return {
         title: meta.title || titleFromFilename(folder),
         description: meta.description || '',
         screenshot: presetRawUrl(main.path),
+        screenshotFilename: main.filename,
         extraScreenshots: extra.map(img => ({
           url: presetRawUrl(img.path),
+          filename: img.filename,
           label: /lock/i.test(img.filename) ? 'Lockscreen preview' : titleFromFilename(img.filename),
         })),
-        pfp: pfp ? { url: presetRawUrl(pfp.path), filename: pfp.filename } : null,
+        avatar: avatar ? { url: presetRawUrl(avatar.path), filename: avatar.filename } : null,
         banner: banner ? { url: presetRawUrl(banner.path), filename: banner.filename } : null,
-        ciImage: ciImage ? { url: presetRawUrl(ciImage.path), filename: ciImage.filename } : null,
+        customImage: customImage ? { url: presetRawUrl(customImage.path), filename: customImage.filename } : null,
         jsonUrl: presetRawUrl(g.jsonPath),
         jsonFilename: g.jsonFilename,
         wallpapers: Array.isArray(meta.wallpapers) ? meta.wallpapers : [],
@@ -3326,17 +3397,17 @@ async function downloadPresetJson(preset, btn){
   }
 }
 
-// Bundles the preset .json together with every wallpaper it uses into one
-// .zip: preset.json at the root, wallpapers/<filename> for each linked
+// Bundles the preset .json together with every asset it uses into one
+// .zip: a single assets/ folder holding preset.json itself alongside the
+// screenshots, avatar, banner image, custom image, and every linked
 // wallpaper (full resolution, not the small preview). Falls back to a
-// plain .json download if JSZip failed to load or the preset has no
-// linked wallpapers to bundle.
+// plain .json download if JSZip failed to load.
 async function downloadPresetBundle(preset, btn){
-  const hasWallpapers = Array.isArray(preset.wallpapers) && preset.wallpapers.length > 0;
-  const hasExtraFiles = !!preset.pfp || !!preset.banner || !!preset.ciImage;
-  if(typeof JSZip === 'undefined' || (!hasWallpapers && !hasExtraFiles)){
+  if(typeof JSZip === 'undefined'){
     return downloadPresetJson(preset, btn);
   }
+
+  const hasWallpapers = Array.isArray(preset.wallpapers) && preset.wallpapers.length > 0;
 
   const label = btn.querySelector('.preset-download-label');
   const originalLabel = label ? label.textContent : '';
@@ -3347,49 +3418,45 @@ async function downloadPresetBundle(preset, btn){
     btn.disabled = true;
 
     const zip = new JSZip();
+    const assetsFolder = zip.folder('assets');
+    const addedFilenames = new Set();
+
     const jsonRes = await fetch(preset.jsonUrl, { cache:'force-cache' });
     if(!jsonRes.ok) throw new Error(`Preset JSON responded ${jsonRes.status}`);
-    zip.file(preset.jsonFilename || 'preset.json', await jsonRes.blob());
+    assetsFolder.file(preset.jsonFilename || 'preset.json', await jsonRes.blob());
+    addedFilenames.add(preset.jsonFilename || 'preset.json');
 
     const missing = [];
 
-    if(preset.pfp){
+    async function addAsset(url, filename){
+      if(!url || !filename) return;
+      if(addedFilenames.has(filename)) return; // already in the zip under this name — e.g. a banner that reuses a wallpaper's filename
       try{
-        const pfpRes = await fetch(preset.pfp.url);
-        if(!pfpRes.ok) throw new Error(`${preset.pfp.filename} responded ${pfpRes.status}`);
-        zip.file(preset.pfp.filename, await pfpRes.blob());
+        const res = await fetch(url);
+        if(!res.ok) throw new Error(`${filename} responded ${res.status}`);
+        assetsFolder.file(filename, await res.blob());
+        addedFilenames.add(filename);
       }catch(err){
-        missing.push(preset.pfp.filename);
+        missing.push(filename);
       }
     }
 
-    if(preset.banner){
-      try{
-        const bannerRes = await fetch(preset.banner.url);
-        if(!bannerRes.ok) throw new Error(`${preset.banner.filename} responded ${bannerRes.status}`);
-        zip.file(preset.banner.filename, await bannerRes.blob());
-      }catch(err){
-        missing.push(preset.banner.filename);
-      }
+    await addAsset(preset.screenshot, preset.screenshotFilename);
+    for(const shot of preset.extraScreenshots || []){
+      await addAsset(shot.url, shot.filename);
     }
-
-    if(preset.ciImage){
-      try{
-        const ciRes = await fetch(preset.ciImage.url);
-        if(!ciRes.ok) throw new Error(`${preset.ciImage.filename} responded ${ciRes.status}`);
-        zip.file(preset.ciImage.filename, await ciRes.blob());
-      }catch(err){
-        missing.push(preset.ciImage.filename);
-      }
-    }
+    if(preset.avatar) await addAsset(preset.avatar.url, preset.avatar.filename);
+    if(preset.banner) await addAsset(preset.banner.url, preset.banner.filename);
+    if(preset.customImage) await addAsset(preset.customImage.url, preset.customImage.filename);
 
     if(hasWallpapers){
-      const wallpapersFolder = zip.folder('wallpapers');
       const results = await Promise.allSettled(
         preset.wallpapers.map(async filename => {
+          if(addedFilenames.has(filename)) return; // same filename already added above (e.g. banner === one of the wallpapers)
           const res = await fetch(fullWallpaperUrl(filename));
           if(!res.ok) throw new Error(`${filename} responded ${res.status}`);
-          wallpapersFolder.file(filename, await res.blob());
+          assetsFolder.file(filename, await res.blob());
+          addedFilenames.add(filename);
         })
       );
       results.forEach((r, i) => { if(r.status === 'rejected') missing.push(preset.wallpapers[i]); });
@@ -3615,20 +3682,20 @@ function buildPresetCard(preset){
   const titleRow = document.createElement('div');
   titleRow.className = 'preset-title-row';
 
-  if(preset.pfp){
-    const pfpBtn = document.createElement('button');
-    pfpBtn.type = 'button';
-    pfpBtn.className = 'preset-pfp';
-    pfpBtn.setAttribute('aria-label', `View profile picture used in ${preset.title}`);
-    pfpBtn.title = 'Profile picture used in this preset';
-    const pfpImg = document.createElement('img');
-    pfpImg.src = makePreviewUrl(preset.pfp.url, 96);
-    pfpImg.alt = `${preset.title} profile picture`;
-    pfpImg.loading = 'lazy';
-    pfpImg.decoding = 'async';
-    pfpBtn.appendChild(pfpImg);
-    pfpBtn.addEventListener('click', () => openPresetLightbox(preset.pfp.url, `${preset.title} profile picture`));
-    titleRow.appendChild(pfpBtn);
+  if(preset.avatar){
+    const avatarBtn = document.createElement('button');
+    avatarBtn.type = 'button';
+    avatarBtn.className = 'preset-pfp';
+    avatarBtn.setAttribute('aria-label', `View avatar used in ${preset.title}`);
+    avatarBtn.title = 'Avatar used in this preset';
+    const avatarImg = document.createElement('img');
+    avatarImg.src = makePreviewUrl(preset.avatar.url, 96);
+    avatarImg.alt = `${preset.title} avatar`;
+    avatarImg.loading = 'lazy';
+    avatarImg.decoding = 'async';
+    avatarBtn.appendChild(avatarImg);
+    avatarBtn.addEventListener('click', () => openPresetLightbox(preset.avatar.url, `${preset.title} avatar`));
+    titleRow.appendChild(avatarBtn);
   }
 
   const title = document.createElement('h3');
@@ -3712,7 +3779,7 @@ function buildPresetCard(preset){
     body.appendChild(groups);
   }
 
-  if(preset.banner || preset.ciImage){
+  if(preset.banner || preset.customImage){
     const extras = document.createElement('details');
     extras.className = 'preset-extras';
     const summary = document.createElement('summary');
@@ -3739,21 +3806,21 @@ function buildPresetCard(preset){
       extraThumbs.appendChild(bannerBtn);
     }
 
-    if(preset.ciImage){
-      const ciBtn = document.createElement('button');
-      ciBtn.type = 'button';
-      ciBtn.className = 'preset-linked-thumb';
-      ciBtn.setAttribute('aria-label', `View CI image used in ${preset.title}`);
-      ciBtn.title = 'CI image';
-      const ciImg = document.createElement('img');
-      ciImg.src = makePreviewUrl(preset.ciImage.url, 120);
-      ciImg.alt = `${preset.title} CI image`;
-      ciImg.loading = 'lazy';
-      ciImg.decoding = 'async';
-      attachThumbLifecycle(ciImg, ciBtn);
-      ciBtn.appendChild(ciImg);
-      ciBtn.addEventListener('click', () => openPresetLightbox(preset.ciImage.url, `${preset.title} CI image`));
-      extraThumbs.appendChild(ciBtn);
+    if(preset.customImage){
+      const customBtn = document.createElement('button');
+      customBtn.type = 'button';
+      customBtn.className = 'preset-linked-thumb';
+      customBtn.setAttribute('aria-label', `View custom image used in ${preset.title}`);
+      customBtn.title = 'Custom image';
+      const customImg = document.createElement('img');
+      customImg.src = makePreviewUrl(preset.customImage.url, 120);
+      customImg.alt = `${preset.title} custom image`;
+      customImg.loading = 'lazy';
+      customImg.decoding = 'async';
+      attachThumbLifecycle(customImg, customBtn);
+      customBtn.appendChild(customImg);
+      customBtn.addEventListener('click', () => openPresetLightbox(preset.customImage.url, `${preset.title} custom image`));
+      extraThumbs.appendChild(customBtn);
     }
 
     const extrasBody = document.createElement('div');
@@ -3764,8 +3831,9 @@ function buildPresetCard(preset){
     setupPresetExtras(extras, extrasBody);
   }
 
-  const hasWallpapersForZip = Array.isArray(preset.wallpapers) && preset.wallpapers.length > 0;
-  const willZip = hasWallpapersForZip || !!preset.pfp || !!preset.banner || !!preset.ciImage;
+  // Every download now bundles preset.json plus an assets/ folder (at
+  // minimum the main screenshot), so the button always advertises the zip.
+  const willZip = true;
   const downloadBtn = document.createElement('button');
   downloadBtn.type = 'button';
   downloadBtn.className = 'filled-btn preset-download-btn';
