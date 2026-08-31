@@ -3175,11 +3175,11 @@ function friendlyWallpaperName(filename){
 
    Downloading a preset zips everything into one bundle: a single assets/
    folder inside the zip holding preset.json itself alongside the avatar,
-   banner image, custom image, the linked wallpapers, and the main preview
-   screenshot (shipped as a fixed "preview.<ext>" filename so tools reading
-   the bundle - e.g. a quickshell config - can find it deterministically
-   instead of guessing at one of the other bundled images). Secondary/
-   extra screenshots are still website-preview-only and aren't bundled. */
+   banner image, custom image, and the linked wallpapers together.
+   Screenshots (main + lockscreen) aren't included in the zip - they're
+   for the website's preview cards, and for external tools (e.g. a
+   quickshell config) that fetch "preview.<ext>"/"preview-lock.<ext>"
+   straight from the repo instead of from a downloaded bundle. */
 const PRESETS_SOURCE = {
   user:   'Blapples',
   repo:   'wallpapers',
@@ -3451,11 +3451,11 @@ async function downloadPresetJson(preset, btn){
 }
 
 // Bundles the preset .json together with every asset it uses into one
-// .zip: a single assets/ folder holding preset.json itself alongside a
-// fixed-name "preview.<ext>" copy of the main screenshot, the avatar,
-// banner image, custom image, and every linked wallpaper (full
-// resolution, not the small preview). Only secondary/extra screenshots
-// stay website-preview-only and are left out of the download.
+// .zip: a single assets/ folder holding preset.json itself alongside the
+// avatar, banner image, custom image, and every linked wallpaper (full
+// resolution, not the small preview). Screenshots (main + lockscreen) are
+// website-preview/external-fetch only and are intentionally left out of
+// the download.
 // Falls back to a plain .json download if JSZip failed to load.
 async function downloadPresetBundle(preset, btn){
   if(typeof JSZip === 'undefined'){
@@ -3496,26 +3496,12 @@ async function downloadPresetBundle(preset, btn){
       }
     }
 
-    if(preset.screenshot){
-      // Ship the main preview under a filename-agnostic, fixed name so a
-      // consumer of the bundle (e.g. a quickshell config linking to these
-      // presets) can find "the" preview deterministically instead of
-      // picking randomly among whatever else happens to be in assets/ -
-      // that's what was happening when this was left out of the zip.
-      const extMatch = (preset.screenshotFilename || '').match(/\.[a-z0-9]+$/i);
-      const previewFilename = `preview${extMatch ? extMatch[0] : '.png'}`;
-      await addAsset(preset.screenshot, previewFilename);
-    }
-    // Same deal for the lockscreen preview, if this preset has one - ships
-    // under the matching fixed "preview-lock.<ext>" name.
-    const lockScreenshot = Array.isArray(preset.extraScreenshots)
-      ? preset.extraScreenshots.find(s => /lock/i.test(s.filename))
-      : null;
-    if(lockScreenshot){
-      const lockExtMatch = lockScreenshot.filename.match(/\.[a-z0-9]+$/i);
-      const previewLockFilename = `preview-lock${lockExtMatch ? lockExtMatch[0] : '.png'}`;
-      await addAsset(lockScreenshot.url, previewLockFilename);
-    }
+    // Screenshots (main + lockscreen) are intentionally left out of the
+    // zip - they're for the website preview cards and for external tools
+    // (e.g. a quickshell config) that fetch preview.<ext>/preview-lock.<ext>
+    // straight from the repo. Users downloading the preset only get the
+    // functional pieces: preset.json, avatar/banner/customImage, and the
+    // linked wallpapers.
     if(preset.avatar) await addAsset(preset.avatar.url, preset.avatar.filename);
     if(preset.banner) await addAsset(preset.banner.url, preset.banner.filename);
     if(preset.customImage) await addAsset(preset.customImage.url, preset.customImage.filename);
