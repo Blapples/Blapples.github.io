@@ -3145,7 +3145,11 @@ function friendlyWallpaperName(filename){
      }
      "avatar", "banner", and "customImage" are each optional and, if
      omitted, fall back to matching a filename containing "avatar"/"pfp",
-     "banner", or "custom-image"/"ci-image" respectively.
+     "banner", or "custom-image"/"ci-image" respectively. Any of the three
+     can also just name one of the filenames already listed in
+     "wallpapers" instead of a separate file in the preset folder — no
+     need to upload a duplicate copy if the banner (say) is one of the
+     wallpapers already linked to this preset.
 
    If meta.json is missing entirely, the title is derived from the folder
    name and every asset is matched by filename convention. A folder missing
@@ -3294,6 +3298,21 @@ async function fetchPresetsFromGitHub(src){
       }
       const { main, extra, avatar, banner, customImage } = pickAssets(g.assets, meta);
       if(!main) return null; // only had e.g. an avatar image, no actual screenshot — skip
+
+      const wallpapers = Array.isArray(meta.wallpapers) ? meta.wallpapers : [];
+
+      // avatar/banner/customImage normally live as their own file inside the
+      // preset's own folder. But if meta.json points one of them at a
+      // filename that's actually one of this preset's linked wallpapers
+      // instead, there's no need to duplicate that file into the preset
+      // folder too — resolve it straight from the wallpapers repo.
+      function resolveImage(local, metaField){
+        if(local) return { url: presetRawUrl(local.path), filename: local.filename };
+        const wpMatch = metaField && wallpapers.find(w => w.toLowerCase() === metaField.toLowerCase());
+        if(wpMatch) return { url: rawWallpaperUrl(wpMatch), filename: wpMatch, fromWallpaper: true };
+        return null;
+      }
+
       return {
         title: meta.title || titleFromFilename(folder),
         description: meta.description || '',
@@ -3304,12 +3323,12 @@ async function fetchPresetsFromGitHub(src){
           filename: img.filename,
           label: /lock/i.test(img.filename) ? 'Lockscreen preview' : titleFromFilename(img.filename),
         })),
-        avatar: avatar ? { url: presetRawUrl(avatar.path), filename: avatar.filename } : null,
-        banner: banner ? { url: presetRawUrl(banner.path), filename: banner.filename } : null,
-        customImage: customImage ? { url: presetRawUrl(customImage.path), filename: customImage.filename } : null,
+        avatar: resolveImage(avatar, meta.avatar),
+        banner: resolveImage(banner, meta.banner),
+        customImage: resolveImage(customImage, meta.customImage),
         jsonUrl: presetRawUrl(g.jsonPath),
         jsonFilename: g.jsonFilename,
-        wallpapers: Array.isArray(meta.wallpapers) ? meta.wallpapers : [],
+        wallpapers,
       };
     })
   );
@@ -3430,7 +3449,7 @@ async function downloadPresetBundle(preset, btn){
 
     async function addAsset(url, filename){
       if(!url || !filename) return;
-      if(addedFilenames.has(filename)) return; // already in the zip under this name — e.g. a banner that reuses a wallpaper's filename
+      if(addedFilenames.has(filename)) return; // already in the zip under this name — e.g. an avatar, banner, or custom image that reuses a wallpaper's exact filename
       try{
         const res = await fetch(url);
         if(!res.ok) throw new Error(`${filename} responded ${res.status}`);
@@ -3452,7 +3471,7 @@ async function downloadPresetBundle(preset, btn){
     if(hasWallpapers){
       const results = await Promise.allSettled(
         preset.wallpapers.map(async filename => {
-          if(addedFilenames.has(filename)) return; // same filename already added above (e.g. banner === one of the wallpapers)
+          if(addedFilenames.has(filename)) return; // same filename already added above (e.g. avatar/banner/customImage === one of the wallpapers)
           const res = await fetch(fullWallpaperUrl(filename));
           if(!res.ok) throw new Error(`${filename} responded ${res.status}`);
           assetsFolder.file(filename, await res.blob());
