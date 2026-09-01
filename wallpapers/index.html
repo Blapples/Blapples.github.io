@@ -3320,6 +3320,43 @@ function writeRecentCommitsCache(added){
   }
 }
 
+/* ---------- Manifest fingerprint: invalidate the commits cache the moment
+ * the repo actually changes, instead of only after the 1-hour TTL above.
+ *
+ * The gallery already fetches the live file list on every load (see
+ * fetchWallpapersFromGitHub), so we get this "did anything change" signal
+ * for free - no extra request needed. If the fingerprint differs from the
+ * last time this browser checked, the cached "what's new" answer is stale
+ * by definition (it was computed before this upload/deletion existed), so
+ * we throw it away and let the normal fetchRecentlyAddedFilenames() call
+ * hit GitHub fresh right away. If nothing changed, the fingerprint matches
+ * and the existing 1-hour cache is left alone - so this never adds extra
+ * API calls, it only ever removes an unnecessary wait.
+ */
+const MANIFEST_FINGERPRINT_KEY = 'blapples-wallpaper-manifest-fingerprint-v1';
+
+function manifestFingerprint(frames){
+  // Cheap but effective: any add, delete, or rename changes either the
+  // count or the sorted filename list, so a real hash isn't necessary.
+  return frames.length + '|' + frames.map(f => f.filename).filter(Boolean).sort().join(',');
+}
+
+function invalidateRecentCommitsCacheIfManifestChanged(frames){
+  try{
+    const fp = manifestFingerprint(frames);
+    const prev = localStorage.getItem(MANIFEST_FINGERPRINT_KEY);
+    // prev === null means this browser has never recorded a fingerprint
+    // (e.g. first-ever visit) - nothing to compare against, and there's no
+    // pre-existing cache in that case anyway, so just record it and move on.
+    if(prev !== null && prev !== fp){
+      localStorage.removeItem(NEW_COMMITS_CACHE_KEY);
+    }
+    localStorage.setItem(MANIFEST_FINGERPRINT_KEY, fp);
+  }catch(err){
+    // Non-fatal - worst case, the plain 1-hour TTL above still applies.
+  }
+}
+
 async function fetchRecentlyAddedFilenames(){
   const cached = readRecentCommitsCache();
   if(cached) return cached;
@@ -4881,6 +4918,11 @@ async function init(){
     // Authoritative: this is the live GitHub listing, so it's the one
     // allowed to stamp genuinely new filenames with today's date.
     renderFrames(finalFrames, false, true);
+    // If the file list itself changed since this browser's last visit,
+    // any cached "what's new" answer predates that change and is stale -
+    // drop it so the check below hits GitHub fresh instead of waiting up
+    // to an hour to notice.
+    invalidateRecentCommitsCacheIfManifestChanged(finalFrames);
     // Then confirm/correct those isNew guesses against the repo's actual
     // commit history in the background, so every device ends up agreeing
     // on what's new instead of it depending on local browser memory.
