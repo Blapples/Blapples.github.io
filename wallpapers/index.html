@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://api.github.com">
 <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     /* Material Expressive-inspired olive / sage palette from the reference */
@@ -36,6 +37,33 @@
     --md-on-surface:#eef1e4;
     --md-on-surface-variant:#aeb69a;
     --md-outline:rgba(190,205,151,.24);
+
+    /* ---------- Glass tokens (Tadami-inspired frosted look) ----------
+       Every floating surface (topbar, chips, buttons, cards, dialog) pulls
+       from this shared set: a faint tinted-white fill, a bright hairline
+       border that reads as a glass rim catching light, a soft inner sheen
+       along the top edge, and a heavier blur+saturate than the old flat
+       panels used. The green identity stays in --md-primary; these tokens
+       just control how "glassy" every surface built from it looks. */
+    /* ---------- Glass tokens (Tadami-inspired frosted look) ----------
+       Every floating surface (topbar, chips, buttons, cards, dialog) pulls
+       from this shared set: a translucent tinted fill, a bright hairline
+       border that reads as a glass rim catching light, a soft inner sheen
+       along the top edge, and a heavier blur+saturate than the old flat
+       panels used. The tint is mixed from --md-primary rather than a
+       fixed color, so every glass surface — including the wallpaper
+       lightbox — recolors along with the active color filter instead of
+       staying stuck on the default green. */
+    --glass-fill:color-mix(in srgb,var(--md-primary) 11%,transparent);
+    --glass-fill-strong:color-mix(in srgb,var(--md-primary) 19%,transparent);
+    --glass-fill-soft:color-mix(in srgb,var(--md-primary) 6%,transparent);
+    --glass-border:color-mix(in srgb,var(--md-primary) 22%,rgba(255,255,255,.32));
+    --glass-border-soft:color-mix(in srgb,var(--md-primary) 14%,rgba(255,255,255,.16));
+    --glass-sheen:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 1px rgba(255,255,255,.04);
+    --glass-blur:blur(30px) saturate(1.6);
+    --glass-blur-sm:blur(18px) saturate(1.5);
+    --glow-primary:0 10px 34px rgba(4,6,3,.42),0 0 0 1px color-mix(in srgb,var(--md-primary) 10%,transparent);
+    --glass-fill-opaque:linear-gradient(165deg,rgba(255,255,255,.07),rgba(255,255,255,0) 45%),color-mix(in srgb,var(--theme-bg-2) 84%,var(--md-primary) 8%);
 
     /* Dynamic color-filter atmosphere. These stay on the current sage theme
        until a specific color filter is selected. */
@@ -63,6 +91,7 @@
 
     --spring:cubic-bezier(.22,1.35,.36,1);
     --standard:cubic-bezier(.2,0,0,1);
+    --bounce:cubic-bezier(.34,1.61,.64,1);
     --font:'Roboto Flex',Roboto,system-ui,sans-serif;
   }
 
@@ -133,107 +162,17 @@
     align-items:center;
     justify-content:space-between;
     gap:20px;
-    background:var(--theme-header-bg);
-    border:1px solid var(--theme-header-border);
-    border-radius:var(--shape-lg);
-    box-shadow:var(--elev-2);
-    backdrop-filter:blur(24px) saturate(1.12);
-    -webkit-backdrop-filter:blur(24px) saturate(1.12);
+    background:var(--glass-fill-strong);
+    border:1px solid var(--glass-border-soft);
+    border-radius:30px;
+    box-shadow:var(--glow-primary),var(--glass-sheen);
+    backdrop-filter:var(--glass-blur);
+    -webkit-backdrop-filter:var(--glass-blur);
     transition:padding .24s cubic-bezier(.22,1.35,.36,1),width .24s cubic-bezier(.22,1.35,.36,1),border-radius .24s ease,box-shadow .24s ease;
-  }
-
-  .header-placeholder{
-    display:none;
-    width:100%;
-    pointer-events:none;
   }
 
   .mobile-top-btn{
     display:none;
-  }
-
-  .topbar.is-compact{
-    position:fixed;
-    top:12px;
-    left:50%;
-    transform:translateX(-50%);
-    width:min(1120px,calc(100% - 36px));
-    margin:0;
-    padding:10px 14px;
-    border-radius:22px;
-    z-index:30;
-    box-shadow:var(--elev-3);
-  }
-
-  .topbar.is-compact .brand{gap:10px}
-  .topbar.is-compact .brand-mark{width:38px;height:38px;border-radius:16px}
-  .topbar.is-compact .brand-mark svg{width:19px;height:19px}
-  .topbar.is-compact h1{font-size:20px}
-  .topbar.is-compact .subtitle,.topbar.is-compact .eyebrow-chip{display:none}
-
-  /* Compact desktop header: keep every filter visible without a horizontal scroller. */
-  .topbar.is-compact{
-    gap:12px;
-  }
-  .topbar.is-compact .brand{
-    flex:0 0 auto;
-    gap:10px;
-  }
-  .topbar.is-compact .brand-copy{
-    width:190px;
-  }
-  .topbar.is-compact .color-filter{
-    flex:1 1 0;
-    width:auto;
-    min-width:0;
-    margin:0;
-  }
-  .topbar.is-compact .color-filter-track{
-    width:100%;
-    min-width:0;
-    padding:0;
-    gap:6px;
-    overflow:visible;
-    justify-content:space-between;
-  }
-  .topbar.is-compact .color-chip{
-    flex:0 1 auto;
-    min-width:0;
-    padding:7px 9px 7px 7px;
-    gap:6px;
-    font-size:12px;
-    box-shadow:none;
-  }
-  .topbar.is-compact .color-chip-swatch{
-    width:22px;
-    height:22px;
-    flex:0 0 22px;
-  }
-  .topbar.is-compact .color-chip-count{
-    display:none;
-  }
-
-  @media (min-width:641px) and (max-width:900px){
-    .topbar.is-compact{
-      width:calc(100% - 24px);
-      padding:8px 10px;
-      gap:8px;
-    }
-    .topbar.is-compact .brand-copy{width:145px;}
-    .topbar.is-compact h1{font-size:17px;}
-    .topbar.is-compact .brand-mark{width:34px;height:34px;}
-    .topbar.is-compact .brand-mark svg{width:17px;height:17px;}
-    .topbar.is-compact .color-filter-track{gap:3px;}
-    .topbar.is-compact .color-chip{
-      padding:6px 6px 6px 5px;
-      gap:4px;
-      font-size:10px;
-    }
-    .topbar.is-compact .color-chip-swatch{
-      width:18px;
-      height:18px;
-      flex-basis:18px;
-    }
   }
 
   .brand{
@@ -249,10 +188,10 @@
     flex:0 0 auto;
     display:grid;
     place-items:center;
-    border-radius:var(--shape-lg);
-    background:var(--md-primary);
+    border-radius:50%;
+    background:linear-gradient(160deg,color-mix(in srgb,var(--md-primary) 100%,white 18%),var(--md-primary) 60%);
     color:var(--md-on-primary);
-    box-shadow:0 5px 18px rgba(0,0,0,.18);
+    box-shadow:0 5px 18px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.4);
   }
 
   .brand-mark svg{width:25px;height:25px;display:block}
@@ -283,9 +222,12 @@
     gap:7px;
     padding:10px 14px;
     border-radius:var(--shape-full);
-    background:rgba(166,184,117,.10);
+    background:var(--glass-fill);
     color:var(--md-on-surface-variant);
-    border:1px solid rgba(235,240,214,.12);
+    border:1px solid var(--glass-border-soft);
+    backdrop-filter:var(--glass-blur-sm);
+    -webkit-backdrop-filter:var(--glass-blur-sm);
+    box-shadow:var(--glass-sheen);
     font-size:12px;
     font-weight:600;
     letter-spacing:.02em;
@@ -317,20 +259,6 @@
   #soundToggleBtn.is-active .icon-sound-on{display:block}
   #soundToggleBtn.is-active .icon-sound-off{display:none}
 
-  .topbar.is-compact .topbar-toggles .icon-btn{
-    width:36px;
-    height:36px;
-  }
-  .topbar.is-compact .topbar-toggles .icon-btn svg{
-    width:16px;
-    height:16px;
-  }
-  .topbar.is-compact .topbar-toggles .icon-btn.back-link{
-    width:auto;
-    padding:0 12px 0 9px;
-    font-size:12.5px;
-  }
-
   /* Color filter — Material Expressive filter-chip row for narrowing the
      gallery to wallpapers that share a dominant color. Colors are sampled
      client-side (see computeFrameColor) and bucketed into a fixed palette,
@@ -338,6 +266,7 @@
   .color-filter{
     width:min(1440px,calc(100% - 36px));
     margin:0 auto 22px;
+    scroll-margin-top:130px;
   }
 
   .color-filter-track{
@@ -358,15 +287,17 @@
     flex:0 0 auto;
     padding:10px 16px 10px 10px;
     border-radius:var(--shape-full);
-    background:var(--md-surface-container-low);
-    border:1px solid var(--md-outline);
+    background:var(--glass-fill);
+    border:1px solid var(--glass-border-soft);
+    backdrop-filter:var(--glass-blur-sm);
+    -webkit-backdrop-filter:var(--glass-blur-sm);
     color:var(--md-on-surface-variant);
     font-size:13px;
     font-weight:650;
     letter-spacing:.01em;
     cursor:pointer;
     white-space:nowrap;
-    box-shadow:var(--elev-1);
+    box-shadow:var(--glass-sheen);
     opacity:0;
     transform:translateY(6px) scale(.94);
     transition:
@@ -382,8 +313,9 @@
 
   .color-chip:hover{
     transform:translateY(-2px);
-    box-shadow:var(--elev-2);
-    border-color:rgba(236,241,211,.28);
+    background:var(--glass-fill-strong);
+    box-shadow:var(--glow-primary),var(--glass-sheen);
+    border-color:var(--glass-border);
   }
   .color-chip.chip-in:active{transform:scale(.95)}
 
@@ -408,12 +340,12 @@
   }
 
   .color-chip.is-active{
-    background:var(--md-primary);
+    background:linear-gradient(165deg,color-mix(in srgb,var(--md-primary) 100%,white 22%),var(--md-primary) 65%);
     color:var(--md-on-primary);
-    border-color:transparent;
-    box-shadow:var(--elev-2);
+    border-color:rgba(255,255,255,.4);
+    box-shadow:0 6px 20px color-mix(in srgb,var(--md-primary) 40%,transparent),inset 0 1px 0 rgba(255,255,255,.5);
   }
-  .color-chip.is-active .color-chip-count{color:var(--md-on-primary);opacity:.65}
+  .color-chip.is-active .color-chip-count{color:#fff;opacity:.75;text-shadow:0 1px 2px rgba(0,0,0,.35)}
   .color-chip.is-active .color-chip-swatch{
     border-color:rgba(23,26,18,.4);
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.15),0 0 0 3px rgba(23,26,18,.14);
@@ -448,6 +380,7 @@
     width:min(1440px,calc(100% - 36px));
     margin:0 auto;
     padding:0 0 150px;
+    scroll-margin-top:120px;
     display:grid;
     grid-template-columns:repeat(auto-fill,minmax(270px,1fr));
     gap:18px;
@@ -467,10 +400,10 @@
     overflow:hidden;
     cursor:pointer;
     padding:0;
-    border-radius:var(--shape-lg);
-    background:rgba(45,50,35,.72);
-    border:1px solid rgba(241,245,218,.12);
-    box-shadow:var(--elev-1);
+    border-radius:28px;
+    background:var(--glass-fill-soft);
+    border:1px solid var(--glass-border-soft);
+    box-shadow:var(--glass-sheen);
     isolation:isolate;
     opacity:0;
     transform:translateY(18px) scale(.97);
@@ -480,7 +413,7 @@
       transform .6s var(--spring),
       filter .5s ease,
       box-shadow .35s var(--standard),
-      border-radius .4s var(--spring);
+      border-color .3s var(--standard);
     content-visibility:auto;
     contain-intrinsic-size:320px 340px;
   }
@@ -511,15 +444,14 @@
      the opposite way on press, like a squeezed squircle, instead of a flat
      uniform radius change. */
   .card:hover,.card:focus-visible{
-    box-shadow:var(--elev-3);
+    box-shadow:var(--glow-primary),0 0 0 1px var(--glass-border);
     transform:translateY(-6px) scale(1.012);
-    border-color:rgba(236,241,211,.24);
-    border-radius:36px 14px 36px 14px;
+    border-color:var(--glass-border);
     z-index:2;
     will-change:transform,box-shadow;
   }
   .card:active{
-    border-radius:14px 36px 14px 36px;
+    transform:translateY(-2px) scale(.99);
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -530,7 +462,6 @@
       transition:box-shadow .2s ease;
     }
     .card:hover,.card:focus-visible,.card:active{
-      border-radius:var(--shape-lg);
       transform:none;
     }
   }
@@ -591,14 +522,17 @@
     align-items:center;
     gap:6px;
     padding:5px 11px 5px 9px;
-    border-radius:var(--shape-full);
-    background:var(--md-primary);
-    color:var(--md-on-primary);
+    border-radius:12px;
+    background:rgba(12,16,9,.55);
+    backdrop-filter:blur(10px) saturate(1.4);
+    -webkit-backdrop-filter:blur(10px) saturate(1.4);
+    border:1px solid var(--glass-border-soft);
+    color:var(--md-primary);
     font-size:11px;
     font-weight:800;
     letter-spacing:.05em;
     text-transform:uppercase;
-    box-shadow:var(--elev-2);
+    box-shadow:0 4px 14px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.14);
     pointer-events:none;
   }
   .new-badge::before{
@@ -607,7 +541,7 @@
     height:6px;
     flex:0 0 auto;
     border-radius:50%;
-    background:var(--md-on-primary);
+    background:var(--md-primary);
     animation:new-badge-pulse 1.8s ease-in-out infinite;
   }
   @keyframes new-badge-pulse{
@@ -618,6 +552,7 @@
   .new-section{
     width:min(1440px,calc(100% - 36px));
     margin:-6px auto 40px;
+    scroll-margin-top:120px;
   }
   .new-section[hidden]{display:none}
 
@@ -662,117 +597,6 @@
 
   @media (prefers-reduced-motion:reduce){
     .new-badge::before{animation:none}
-  }
-
-  /* ---------- Widget Presets section ---------- */
-  .presets-section{
-    width:min(1440px,calc(100% - 36px));
-    margin:-6px auto 40px;
-  }
-  .presets-section[hidden]{display:none}
-
-  .presets-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
-    gap:18px;
-  }
-  @media (max-width:900px){
-    .presets-grid{grid-template-columns:1fr}
-  }
-
-  .preset-card{
-    display:flex;
-    flex-direction:column;
-    border-radius:var(--shape-lg);
-    background:var(--md-surface-container);
-    border:1px solid var(--md-outline);
-    box-shadow:var(--elev-1);
-    overflow:hidden;
-    transition:transform .3s var(--spring),box-shadow .3s var(--standard);
-  }
-  .preset-card:hover{
-    transform:translateY(-4px);
-    box-shadow:var(--elev-2);
-  }
-  .preset-screenshot-btn{
-    display:block;
-    width:100%;
-    padding:0;
-    cursor:pointer;
-    overflow:hidden;
-  }
-  .preset-screenshot{
-    width:100%;
-    aspect-ratio:16 / 10;
-    object-fit:cover;
-    display:block;
-    background:
-      radial-gradient(circle at 50% 35%,rgba(177,190,140,.20),transparent 55%),
-      rgba(8,10,7,.92);
-    transition:transform .5s var(--standard);
-  }
-  .preset-screenshot-btn:hover .preset-screenshot{transform:scale(1.04)}
-  .preset-body{
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-    padding:16px 18px 18px;
-  }
-  .preset-title{
-    margin:0;
-    font-size:17px;
-    font-weight:700;
-    letter-spacing:-.01em;
-    color:var(--md-on-surface);
-  }
-  .preset-desc{
-    margin:0;
-    font-size:13.5px;
-    line-height:1.5;
-    color:var(--md-on-surface-variant);
-  }
-  .preset-linked-row{
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    margin-top:2px;
-  }
-  .preset-linked-label{
-    font-size:11px;
-    font-weight:700;
-    letter-spacing:.05em;
-    text-transform:uppercase;
-    color:var(--md-on-surface-variant);
-  }
-  .preset-linked-thumbs{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-  }
-  .preset-linked-thumb{
-    width:52px;
-    height:52px;
-    padding:0;
-    border-radius:12px;
-    overflow:hidden;
-    border:1px solid var(--md-outline);
-    cursor:pointer;
-    flex:0 0 auto;
-    transition:transform .25s var(--spring),border-color .25s ease;
-  }
-  .preset-linked-thumb:hover{
-    transform:scale(1.08);
-    border-color:var(--md-primary);
-  }
-  .preset-linked-thumb img{
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    display:block;
-  }
-  .preset-download-btn{
-    margin-top:6px;
-    align-self:flex-start;
   }
 
   /* ---------- Viewport-based image loading ---------- */
@@ -836,25 +660,290 @@
   .fab{
     position:fixed;
     right:28px;
-    bottom:28px;
+    bottom:104px;
     z-index:40;
     display:inline-flex;
     align-items:center;
     gap:10px;
     padding:15px 22px 15px 18px;
-    border-radius:var(--shape-lg);
-    background:var(--md-primary);
+    border-radius:var(--shape-full);
+    background:linear-gradient(165deg,color-mix(in srgb,var(--md-primary) 100%,white 24%),var(--md-primary) 62%);
     color:var(--md-on-primary);
     font-weight:700;
     font-size:14px;
     cursor:pointer;
-    box-shadow:var(--elev-3);
-    transition:box-shadow .25s var(--standard),transform .2s var(--spring),border-radius .35s var(--spring);
+    box-shadow:0 12px 32px color-mix(in srgb,var(--md-primary) 38%,transparent),inset 0 1px 0 rgba(255,255,255,.5);
+    transition:box-shadow .25s var(--standard),transform .2s var(--spring);
   }
 
   .fab:hover{
     transform:translateY(-3px) scale(.995);
-    border-radius:var(--shape-lg);
+  }
+
+  /* ---------- Mobile dock ----------
+     A fixed bottom-of-screen stack holding two bars: the color-filter
+     strip (always visible, never a popover) directly above the bottom
+     nav pill. Both are full-width children of this flex column so the
+     strip simply sits above the nav bar in normal flow — no manual
+     pixel math to keep them apart as the strip's height changes with
+     however many colors have been discovered. */
+  .mobile-dock{
+    position:fixed;
+    left:50%;
+    bottom:16px;
+    transform:translateX(-50%);
+    z-index:60;
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    gap:8px;
+    width:min(440px,calc(100% - 24px));
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+
+  /* ---------- Color strip ----------
+     The color-filter chips, always on screen right above the bottom
+     nav — no icon to tap, no popover to open or close. On phones this
+     is still its own boxed glass bar (matching the nav pill below it);
+     on wider screens the box goes away entirely and the chips just
+     float in a single row (see the min-width:641px override below). */
+  .color-strip{
+    padding:8px 8px 10px;
+    border-radius:22px;
+    background:var(--glass-fill-opaque);
+    border:1px solid var(--glass-border);
+    box-shadow:0 14px 38px rgba(0,0,0,.5),var(--glass-sheen);
+    backdrop-filter:blur(30px) saturate(1.6);
+    -webkit-backdrop-filter:blur(30px) saturate(1.6);
+  }
+  .color-strip .color-filter{width:100%;margin:0;scroll-margin-top:0}
+  .color-strip .color-filter-track{padding:0 2px}
+
+  /* On phones the strip is just plain color circles — no name, no count,
+     just the swatch — wrapping onto as many rows as it needs instead of
+     scrolling, so every color sits on screen and is reachable with one
+     tap. (Counts stay hidden here via the existing max-width:1000px rule
+     below — no override needed.) */
+  @media (max-width:640px){
+    .color-strip .color-filter-track{
+      flex-wrap:wrap;
+      overflow-x:visible;
+      justify-content:center;
+      gap:8px;
+    }
+    .color-strip .color-chip{
+      padding:8px;
+      gap:0;
+    }
+    .color-strip .color-chip-label{
+      display:none;
+    }
+  }
+
+  /* On desktop the strip drops the color-name text (just the swatch and
+     the count survive), sits in one straight row with no wrapping, and
+     loses its glass box entirely — the chips float freely right above
+     the nav pill instead of sitting inside a container of their own.
+     The dock itself widens and re-centers its children so the chip row
+     isn't squeezed into the same ~440px column as the nav bar below it,
+     and the nav bar gets its own fixed width back now that the dock no
+     longer stretches it. Counts stay visible here even though the
+     shared .color-chip-count rule hides them below 1000px in favor of
+     names — that rule doesn't apply once the name itself is gone. */
+  @media (min-width:641px){
+    .mobile-dock{
+      width:auto;
+      max-width:calc(100% - 24px);
+      align-items:center;
+    }
+    .bottom-nav{width:min(440px,calc(100% - 24px))}
+    .color-strip{
+      padding:0;
+      border-radius:0;
+      background:none;
+      border:0;
+      box-shadow:none;
+      backdrop-filter:none;
+      -webkit-backdrop-filter:none;
+      max-width:calc(100vw - 24px);
+    }
+    .color-strip .color-filter-track{
+      flex-wrap:nowrap;
+      overflow-x:visible;
+      justify-content:center;
+      gap:8px;
+    }
+    .color-strip .color-chip{
+      padding:6px 11px 6px 6px;
+      gap:6px;
+      background:var(--glass-fill-opaque);
+      box-shadow:0 8px 22px rgba(0,0,0,.4),var(--glass-sheen);
+    }
+    .color-strip .color-chip-label{
+      display:none;
+    }
+    .color-strip .color-chip-count{
+      display:inline !important;
+      margin-left:0;
+      font-size:12px;
+    }
+  }
+
+  /* ---------- Bottom nav (Tadami-style) ----------
+     A persistent floating glass pill bar with four real sections of
+     this site: Home (scroll to top), Gallery (the wallpaper grid),
+     Options (sound/roast toggles, tucked into a small popover since
+     they're settings rather than a place to navigate to) and Presets
+     (a direct link to the Widget Presets page). Mirrors the
+     icon-above-label layout and the filled pill behind the active icon
+     from the reference screenshots, just mapped onto this site's
+     actual features instead of a manga reader's tabs. */
+  .bottom-nav{
+    display:flex;
+    align-items:stretch;
+    gap:2px;
+    width:100%;
+    padding:7px 6px;
+    border-radius:26px;
+    background:var(--glass-fill-opaque);
+    border:1px solid var(--glass-border);
+    box-shadow:0 14px 38px rgba(0,0,0,.5),var(--glass-sheen);
+    backdrop-filter:blur(36px) saturate(1.7);
+    -webkit-backdrop-filter:blur(36px) saturate(1.7);
+  }
+
+  .bottom-nav-item{
+    flex-grow:1;
+    flex-shrink:1;
+    flex-basis:0;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    padding:6px 2px;
+    border-radius:16px;
+    color:var(--md-on-surface-variant);
+    cursor:pointer;
+    opacity:1;
+    transition:
+      color .2s ease,
+      transform .15s var(--spring),
+      flex-grow .5s var(--standard),
+      opacity .35s var(--bounce),
+      padding .45s var(--standard);
+  }
+  .bottom-nav-item:active{transform:scale(.92)}
+  .bottom-nav-item.is-collapsed{
+    flex-grow:0;
+    flex-shrink:0;
+    min-width:0;
+    padding:0;
+    opacity:0;
+    pointer-events:none;
+    overflow:hidden;
+  }
+
+  .bottom-nav-icon{
+    width:40px;
+    height:26px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:13px;
+    transform:scale(1);
+    transition:background .25s var(--spring),box-shadow .25s ease,transform .5s var(--bounce);
+  }
+  .bottom-nav-icon svg{width:19px;height:19px;display:block}
+
+  .bottom-nav-label{
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.01em;
+    white-space:nowrap;
+    transform:scale(1);
+    transition:color .2s ease,transform .5s var(--bounce);
+  }
+
+  /* Icon and label pop with a springy overshoot as the item collapses
+     into (or expands back out of) the nav bar, while the item itself
+     just eases its width smoothly — keeps the bounce readable without
+     making the neighboring items jitter. */
+  .bottom-nav-item.is-collapsed .bottom-nav-icon,
+  .bottom-nav-item.is-collapsed .bottom-nav-label{
+    transform:scale(.35);
+    transition-duration:.3s;
+  }
+
+  .bottom-nav-item.is-active{color:var(--md-on-surface)}
+  .bottom-nav-item.is-active .bottom-nav-icon{
+    background:linear-gradient(165deg,color-mix(in srgb,var(--md-primary) 100%,white 22%),var(--md-primary) 62%);
+    box-shadow:0 4px 14px color-mix(in srgb,var(--md-primary) 42%,transparent),inset 0 1px 0 rgba(255,255,255,.5);
+    color:var(--md-on-primary);
+  }
+  .bottom-nav-item.is-active .bottom-nav-label{color:var(--md-primary)}
+
+  .more-sheet{
+    position:fixed;
+    left:50%;
+    bottom:98px;
+    transform:translateX(-50%);
+    z-index:59;
+    width:min(280px,calc(100% - 32px));
+  }
+  .more-sheet[hidden]{display:none}
+  .more-sheet-inner{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    padding:8px;
+    border-radius:22px;
+    background:var(--glass-fill-opaque);
+    border:1px solid var(--glass-border);
+    box-shadow:0 16px 40px rgba(0,0,0,.5),var(--glass-sheen);
+    backdrop-filter:blur(30px) saturate(1.6);
+    -webkit-backdrop-filter:blur(30px) saturate(1.6);
+    animation:dialog-in .25s var(--spring);
+  }
+  .more-sheet-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:100%;
+    padding:11px 12px;
+    border-radius:14px;
+    background:transparent;
+    border:0;
+    color:var(--md-on-surface);
+    font-size:13.5px;
+    font-weight:650;
+    cursor:pointer;
+    text-decoration:none;
+    transition:background .2s ease;
+  }
+  .more-sheet-item:hover{background:var(--glass-fill-strong)}
+  .more-sheet-item.is-active{color:var(--md-primary)}
+  .more-sheet-icon{
+    width:30px;
+    height:30px;
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:50%;
+    background:var(--glass-fill);
+  }
+  .more-sheet-icon svg{width:16px;height:16px}
+  .more-sheet-item.is-active .more-sheet-icon{
+    background:var(--md-primary);
+    color:var(--md-on-primary);
+  }
+
+  @media (max-width:640px){
+    .mobile-dock{width:calc(100% - 20px);bottom:12px}
+    .fab{right:16px;bottom:96px}
+    .more-sheet{bottom:88px}
   }
   .fab:active{transform:scale(.94)}
   .fab svg{width:19px;height:19px}
@@ -881,14 +970,15 @@
     max-height:94vh;
     overflow:auto;
     padding:16px;
-    background:color-mix(in srgb,var(--md-primary-container) 48%,#171a14 52%);
-    border:1px solid color-mix(in srgb,var(--md-primary) 28%,transparent);
-    border-radius:var(--shape-lg);
+    background:var(--glass-fill-strong);
+    border:1px solid var(--glass-border);
+    border-radius:32px;
     box-shadow:
-      0 18px 50px rgba(0,0,0,.34),
-      0 0 45px color-mix(in srgb,var(--md-primary) 12%,transparent);
-    backdrop-filter:blur(30px) saturate(1.15);
-    -webkit-backdrop-filter:blur(30px) saturate(1.15);
+      0 18px 50px rgba(0,0,0,.4),
+      0 0 45px color-mix(in srgb,var(--md-primary) 12%,transparent),
+      var(--glass-sheen);
+    backdrop-filter:var(--glass-blur);
+    -webkit-backdrop-filter:var(--glass-blur);
     animation:dialog-in .45s var(--spring);
     transition:background .5s ease,border-color .5s ease,box-shadow .5s ease,
                width .4s var(--spring),max-height .4s var(--spring);
@@ -934,9 +1024,11 @@
   .dialog-count{
     padding:9px 13px;
     border-radius:var(--shape-full);
-    background:color-mix(in srgb,var(--md-primary) 12%,transparent);
+    background:var(--glass-fill);
     color:var(--md-on-surface-variant);
-    border:1px solid color-mix(in srgb,var(--md-primary) 12%,transparent);
+    border:1px solid var(--glass-border-soft);
+    backdrop-filter:var(--glass-blur-sm);
+    -webkit-backdrop-filter:var(--glass-blur-sm);
     font-size:12px;
     font-weight:650;
     transition:background .4s ease,border-color .4s ease,color .4s ease;
@@ -1173,20 +1265,23 @@
   .icon-btn{
     width:44px;
     height:44px;
-    border-radius:var(--shape-lg);
+    border-radius:50%;
     display:flex;
     align-items:center;
     justify-content:center;
-    background:color-mix(in srgb,var(--md-primary) 16%,transparent);
-    border:1px solid color-mix(in srgb,var(--md-primary) 26%,transparent);
+    background:var(--glass-fill);
+    border:1px solid var(--glass-border-soft);
+    box-shadow:var(--glass-sheen);
+    backdrop-filter:var(--glass-blur-sm);
+    -webkit-backdrop-filter:var(--glass-blur-sm);
     color:var(--md-on-surface);
     cursor:pointer;
-    transition:background .2s ease,transform .18s var(--spring),border-radius .3s var(--spring);
+    transition:background .2s ease,transform .18s var(--spring),border-color .2s ease,box-shadow .2s ease;
   }
 
   .icon-btn:hover{
-    background:color-mix(in srgb,var(--md-primary) 28%,var(--md-secondary-container) 72%);
-    border-radius:var(--shape-lg);
+    background:var(--glass-fill-strong);
+    border-color:var(--glass-border);
   }
   .icon-btn:active{transform:scale(.9)}
   .icon-btn svg{width:19px;height:19px}
@@ -1194,6 +1289,7 @@
   .icon-btn.back-link{
     width:auto;
     height:44px;
+    border-radius:var(--shape-full);
     padding:0 16px 0 12px;
     gap:8px;
     display:inline-flex;
@@ -1238,18 +1334,18 @@
     display:inline-flex;
     align-items:center;
     gap:8px;
-    background:var(--md-primary);
+    background:linear-gradient(165deg,color-mix(in srgb,var(--md-primary) 100%,white 24%),var(--md-primary) 62%);
     color:var(--md-on-primary);
     padding:12px 20px;
-    border-radius:var(--shape-lg);
+    border-radius:var(--shape-full);
     font-weight:700;
     font-size:14px;
     cursor:pointer;
-    transition:filter .2s ease,transform .15s var(--spring),border-radius .3s var(--spring);
+    box-shadow:0 8px 24px color-mix(in srgb,var(--md-primary) 32%,transparent),inset 0 1px 0 rgba(255,255,255,.5);
+    transition:filter .2s ease,transform .15s var(--spring);
   }
   .filled-btn:hover{
     filter:brightness(1.05);
-    border-radius:var(--shape-lg);
   }
   .filled-btn:active{transform:scale(.95)}
   .filled-btn svg{width:17px;height:17px}
@@ -1413,135 +1509,8 @@
     .card{height:320px}
   }
 
-  /* Mobile: compact floating color filters beside Surprise Me */
-  .mobile-color-dock{display:none;}
 
   @media (max-width:640px){
-    /* Keep the floating mobile controls clean: no extra black top circle. */
-    .mobile-top-btn{
-      display:none !important;
-    }
-
-    .mobile-color-dock{
-      position:fixed;
-      left:14px;
-      bottom:14px;
-      z-index:51;
-      display:flex;
-      align-items:center;
-      gap:7px;
-      max-width:calc(100vw - 76px);
-      padding:7px 5px;
-      border:0;
-      border-radius:0;
-      background:transparent;
-      box-shadow:none;
-      backdrop-filter:none;
-      -webkit-backdrop-filter:none;
-      opacity:0;
-      transform:translate3d(0,18px,0) scale(.96);
-      filter:blur(3px);
-      pointer-events:none;
-      transition:
-        opacity .5s cubic-bezier(.22,1,.36,1),
-        transform .65s cubic-bezier(.16,1,.3,1),
-        filter .5s ease;
-      will-change:transform,opacity,filter;
-    }
-
-    body.mobile-color-dock-visible .mobile-color-dock{
-      opacity:1;
-      transform:translate3d(0,0,0) scale(1);
-      filter:blur(0);
-      pointer-events:auto;
-    }
-
-    .mobile-color-dots{
-      display:flex;
-      align-items:center;
-      justify-content:flex-start;
-      gap:6px;
-      width:max-content;
-      max-width:none;
-      box-sizing:border-box;
-      /*
-       * No horizontal scrolling and no flex-shrinking. Every filter stays a
-       * true circle; the row is sized to fit beside the Surprise Me button.
-       * Extra padding leaves room for the selected white outline.
-       */
-      padding:9px 10px;
-      margin:-9px -10px;
-      overflow:visible;
-      scrollbar-width:none;
-    }
-
-    .mobile-color-dots::-webkit-scrollbar{display:none;}
-
-    .mobile-color-dot{
-      flex:0 0 28px;
-      width:28px;
-      min-width:28px;
-      max-width:28px;
-      height:28px;
-      padding:0;
-      border-radius:50%;
-      border:2px solid transparent;
-      box-shadow:0 1px 5px rgba(0,0,0,.22);
-      transition:
-        transform .35s cubic-bezier(.16,1,.3,1),
-        border-color .3s ease,
-        box-shadow .35s ease;
-    }
-
-    .mobile-color-dot:nth-child(1){transition-delay:0ms;}
-    .mobile-color-dot:nth-child(2){transition-delay:25ms;}
-    .mobile-color-dot:nth-child(3){transition-delay:45ms;}
-    .mobile-color-dot:nth-child(4){transition-delay:65ms;}
-    .mobile-color-dot:nth-child(5){transition-delay:85ms;}
-    .mobile-color-dot:nth-child(6){transition-delay:105ms;}
-    .mobile-color-dot:nth-child(7){transition-delay:125ms;}
-
-    .mobile-color-dot.is-active{
-      transform:scale(1.13);
-      border-color:#fff;
-      box-shadow:
-        0 0 0 2px rgba(255,255,255,.96),
-        0 0 0 5px color-mix(in srgb,var(--md-primary) 25%,transparent);
-      position:relative;
-      z-index:2;
-    }
-
-    .mobile-color-dot[data-color="all"]{
-      background:
-        conic-gradient(
-          from 0deg,
-          #ef4444 0deg 55deg,
-          #f59e0b 55deg 105deg,
-          #facc15 105deg 155deg,
-          #4ade80 155deg 215deg,
-          #38bdf8 215deg 275deg,
-          #6366f1 275deg 325deg,
-          #c084fc 325deg 360deg
-        );
-      border-color:transparent;
-    }
-
-    .mobile-color-dot[data-color="all"].is-active{
-      border-color:#fff;
-    }
-
-    @media (prefers-reduced-motion:reduce){
-      .mobile-color-dock,
-      .mobile-color-dot{
-        transition:none;
-        filter:none;
-        transform:none;
-      }
-    }
-  }
-
-  @media (max-width:640px){
-    .topbar.is-mobile-hidden{transform:translateY(calc(-100% - 24px));opacity:0;pointer-events:none;}
     .mobile-top-btn{display:none !important;}
     .mobile-top-btn.visible{opacity:1;transform:none;pointer-events:auto;}
     .mobile-top-btn svg{width:18px;height:18px;}
@@ -1554,7 +1523,7 @@
       border-radius:var(--shape-lg);
     }
 
-    .brand-mark{width:44px;height:44px;border-radius:var(--shape-lg)}
+    .brand-mark{width:44px;height:44px;border-radius:50%}
     .brand-mark svg{width:21px;height:21px;display:block}
     h1{font-size:25px}
     .subtitle{max-width:58vw;font-size:12px}
@@ -1563,6 +1532,18 @@
 
     .topbar-toggles .icon-btn{width:38px;height:38px}
     .topbar-toggles .icon-btn svg{width:16px;height:16px}
+
+    /* The Widget Presets link is the odd one out here — a text-label pill
+       while Sound/Roast are plain 38x38 icon circles next to it. Match it
+       to those on phone: icon only, same size, label hidden. */
+    .topbar-toggles .icon-btn.back-link{
+      width:38px;
+      padding:0;
+      gap:0;
+    }
+    .topbar-toggles .icon-btn.back-link span{
+      display:none;
+    }
 
     .color-filter{width:calc(100% - 20px);margin:0 auto 16px}
     .color-filter-track{gap:6px}
@@ -1587,15 +1568,15 @@
 
     .fab{
       right:14px;
-      bottom:14px;
+      bottom:96px;
       padding:15px;
-      border-radius:var(--shape-lg);
+      border-radius:50%;
     }
     .fab .fab-label{display:none}
 
     .dialog{
       padding:10px;
-      border-radius:var(--shape-lg);
+      border-radius:26px;
     }
   }
 
@@ -1984,84 +1965,6 @@
     .site-intro{transition:none}
   }
 
-
-  /* ---------- Responsive header fix for medium/smaller widths ---------- */
-  @media (min-width:641px) and (max-width:900px){
-    .topbar,
-    .topbar.is-compact{
-      width:calc(100% - 24px);
-      padding:8px 10px;
-      gap:8px;
-      flex-wrap:wrap;
-      align-items:center;
-    }
-
-    .topbar .brand,
-    .topbar.is-compact .brand{
-      flex:1 1 100%;
-      width:100%;
-      min-width:0;
-    }
-
-    .topbar .brand-copy,
-    .topbar.is-compact .brand-copy{
-      width:auto;
-      min-width:0;
-      flex:1 1 auto;
-    }
-
-    .topbar .color-filter,
-    .topbar.is-compact .color-filter{
-      flex:1 1 100%;
-      width:100%;
-      min-width:0;
-      margin:0;
-      overflow:hidden;
-    }
-
-    .topbar .color-filter-track,
-    .topbar.is-compact .color-filter-track{
-      width:100%;
-      min-width:0;
-      justify-content:flex-start;
-      overflow-x:auto;
-      overflow-y:hidden;
-      gap:6px;
-      padding:1px 2px 4px;
-      scrollbar-width:none;
-      -ms-overflow-style:none;
-    }
-
-    .topbar .color-filter-track::-webkit-scrollbar,
-    .topbar.is-compact .color-filter-track::-webkit-scrollbar{
-      display:none;
-    }
-
-    .topbar .color-chip,
-    .topbar.is-compact .color-chip{
-      flex:0 0 auto;
-      white-space:nowrap;
-    }
-  }
-
-
-  /* Responsive color filter: keep the chips usable instead of forcing them to shrink. */
-  @media (max-width:1200px) and (min-width:641px){
-    .topbar.is-compact .brand-copy{width:145px;}
-    .topbar.is-compact .color-filter-track{
-      justify-content:flex-start;
-      overflow-x:auto;
-      overflow-y:hidden;
-      scrollbar-width:none;
-      -ms-overflow-style:none;
-      padding:1px 2px 4px;
-    }
-    .topbar.is-compact .color-filter-track::-webkit-scrollbar{display:none;}
-    .topbar.is-compact .color-chip{
-      flex:0 0 auto;
-      white-space:nowrap;
-    }
-  }
 
   /* At narrower widths, prioritize filter names over counts. */
   @media (max-width:1000px){
@@ -2710,6 +2613,7 @@
      release curve above but shorter and with no overshoot. */
   transition:transform .12s cubic-bezier(.3,0,.4,1);
 }
+
 </style>
 </head>
 <body>
@@ -2759,7 +2663,7 @@
     <div class="topbar-end">
       <span class="eyebrow-chip">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2-6.3-4.6-6.3 4.6 2.3-7.2-6-4.6h7.6z"/></svg>
-        Curated gallery
+        <span id="wallpaperCountChip">Curated gallery</span>
       </span>
       <div class="topbar-toggles">
         <button type="button" class="icon-btn is-active" id="soundToggleBtn" aria-pressed="true" aria-label="Turn sound effects off">
@@ -2776,22 +2680,7 @@
       </div>
     </div>
   </header>
-  <div class="header-placeholder" id="headerPlaceholder" aria-hidden="true"></div>
   <button class="mobile-top-btn" id="mobileTopBtn" aria-label="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11l6-6 6 6"/><path d="M12 5v14"/></svg><span>Back to top</span></button>
-  <div class="mobile-color-dock" id="mobileColorDock" aria-label="Quick color filters">
-    <div class="mobile-color-dots" id="mobileColorDots"></div>
-  </div>
-
-
-  <nav class="color-filter" id="colorFilter" aria-label="Filter wallpapers by color">
-    <div class="color-filter-track" id="colorFilterTrack">
-      <button type="button" class="color-chip chip-in is-active" id="colorFilterAll" data-color="all" aria-pressed="true">
-        <span class="color-chip-swatch color-chip-swatch--all" aria-hidden="true"></span>
-        All colors
-        <span class="color-chip-count" id="colorFilterAllCount"></span>
-      </button>
-    </div>
-  </nav>
 
   <section class="new-section" id="newSection" hidden>
     <div class="new-section-head">
@@ -2869,6 +2758,52 @@
     </div>
   </div>
 
+  <div class="mobile-dock" id="mobileDock">
+    <div class="color-strip" id="colorStrip">
+      <nav class="color-filter" id="colorFilter" aria-label="Filter wallpapers by color">
+        <div class="color-filter-track" id="colorFilterTrack">
+          <button type="button" class="color-chip chip-in is-active" id="colorFilterAll" data-color="all" aria-pressed="true" aria-label="All colors">
+            <span class="color-chip-swatch color-chip-swatch--all" aria-hidden="true"></span>
+            <span class="color-chip-label">All colors</span>
+            <span class="color-chip-count" id="colorFilterAllCount"></span>
+          </button>
+        </div>
+      </nav>
+    </div>
+
+    <nav class="bottom-nav" id="bottomNav" aria-label="Site navigation">
+      <button type="button" class="bottom-nav-item is-active" id="navHome" data-nav="home" aria-label="Home">
+        <span class="bottom-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9a1 1 0 0 0 1 1H9.5a1 1 0 0 0 1-1v-4h3v4a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-9"/></svg></span>
+        <span class="bottom-nav-label">Home</span>
+      </button>
+      <button type="button" class="bottom-nav-item" id="navGallery" data-nav="gallery" aria-label="Gallery">
+        <span class="bottom-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></span>
+        <span class="bottom-nav-label">Gallery</span>
+      </button>
+      <a class="bottom-nav-item" id="navPresets" href="blapples_widget_presets.html" aria-label="Widget Presets">
+        <span class="bottom-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+        <span class="bottom-nav-label">Presets</span>
+      </a>
+      <button type="button" class="bottom-nav-item" id="navMore" data-nav="more" aria-label="Options" aria-haspopup="true" aria-expanded="false">
+        <span class="bottom-nav-icon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg></span>
+        <span class="bottom-nav-label">Options</span>
+      </button>
+    </nav>
+  </div>
+
+  <div class="more-sheet" id="moreSheet" hidden>
+    <div class="more-sheet-inner">
+      <button type="button" class="more-sheet-item" id="moreSoundBtn">
+        <span class="more-sheet-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg></span>
+        <span>Sound effects</span>
+      </button>
+      <button type="button" class="more-sheet-item" id="moreRoastBtn">
+        <span class="more-sheet-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5c-1 2-3.2 4-3.2 7.3a3.2 3.2 0 0 0 6.4 0c0-1-.4-1.7-.4-1.7s-.2 1.1-1 1.1c.5-1.6-.5-2.7-.5-3.8 0 0-1 .6-1 1.7-.5-.6-.5-1.7 0-3.3 0 0-.3-.7-.3-1.3z"/><path d="M9 13.2c-1.6 1-2.6 2.6-2.6 4.6a5.6 5.6 0 0 0 11.2 0c0-2.6-1.5-4.2-1.5-4.2s.1 1.8-1.1 2.5c.6-2.4-1-3.6-1-3.6"/></svg></span>
+        <span>Roast Me captions</span>
+      </button>
+    </div>
+  </div>
+
 <script>
 /* ---------- Preview protection ---------- */
 // Wallpapers can only be saved through the site's Download button.
@@ -2878,6 +2813,7 @@ document.addEventListener('dragstart', event => {
   if(event.target instanceof HTMLImageElement || event.target.closest?.('.card, .dialog-media')){
     event.preventDefault();
   }
+
 });
 
 /* ---------- Wallpaper source ----------
@@ -3212,6 +3148,20 @@ function writeWallpaperCache(frames){
 const NEW_TRACKING_KEY = 'blapples-wallpaper-first-seen-v1';
 const NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 
+// How far back the git-history check (below) looks when confirming upload
+// dates for SORT ORDER, as opposed to the "New" badge above. These used to
+// share the same 7-day window, which caused a real bug: a wallpaper's sort
+// date could only ever be confirmed by a live GitHub check while it was
+// still within its first 7 days. If no browser happened to visit (and thus
+// cache that confirmed date) during that window - and the baked-in
+// BASELINE_CONFIRMED_DATES snapshot hadn't been regenerated since - the
+// wallpaper aged out of "new" with no confirmed date at all, and
+// sortFramesByRecency() dropped it to the very bottom of the grid instead
+// of keeping it near the top. Giving date-confirmation a much longer
+// runway than the badge's 7 days makes that far less likely, without
+// changing how long the "New" badge itself shows.
+const DATE_CONFIRM_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 function readFirstSeenMap(){
   try{
     const raw = localStorage.getItem(NEW_TRACKING_KEY);
@@ -3293,9 +3243,10 @@ function trackNewWallpapers(frames, isAuthoritative=true){
  * applyGitHistoryNewFlags below); the guess above still handles the very
  * first, instant paint before this network round-trip finishes.
  */
-const NEW_COMMITS_CACHE_KEY = 'blapples-wallpaper-recent-commits-v4';
-// An hour is plenty fresh for a "within the last 7 days" badge, and keeps a
-// burst of page loads from re-walking commit history every single time.
+const NEW_COMMITS_CACHE_KEY = 'blapples-wallpaper-recent-commits-v5';
+// An hour is plenty fresh for confirming upload dates within a 30-day
+// window, and keeps a burst of page loads from re-walking commit history
+// every single time.
 const NEW_COMMITS_CACHE_TTL_MS = 60 * 60 * 1000;
 
 function readRecentCommitsCache(){
@@ -3362,7 +3313,11 @@ async function fetchRecentlyAddedFilenames(){
   if(cached) return cached;
 
   const {user, repo, path, branch} = GITHUB_SOURCE;
-  const since = new Date(Date.now() - NEW_WINDOW_MS).toISOString();
+  // Widened to DATE_CONFIRM_WINDOW_MS (30 days) rather than NEW_WINDOW_MS
+  // (7 days) - see the comment on DATE_CONFIRM_WINDOW_MS above. Whether a
+  // file is new enough for the badge is still decided separately, against
+  // the stricter NEW_WINDOW_MS, wherever this result is used.
+  const since = new Date(Date.now() - DATE_CONFIRM_WINDOW_MS).toISOString();
   const pathParam = path ? `&path=${encodeURIComponent(path)}` : '';
   const listUrl = `https://api.github.com/repos/${user}/${repo}/commits?sha=${encodeURIComponent(branch)}&since=${since}${pathParam}&per_page=100`;
 
@@ -3411,7 +3366,7 @@ async function fetchRecentlyAddedFilenames(){
   const boundaryCommits = await boundaryRes.json();
   if(!Array.isArray(boundaryCommits)) throw new Error('Unexpected GitHub boundary-commit response');
   // No commit exists before the window at all (the repo's whole history
-  // fits inside the last 7 days) - nothing to diff against, so every
+  // fits inside the last 30 days) - nothing to diff against, so every
   // in-window commit's additions are genuinely new by definition.
   const base = boundaryCommits[0] ? boundaryCommits[0].sha : null;
 
@@ -3463,13 +3418,14 @@ async function fetchRecentlyAddedFilenames(){
 }
 
 /* ---------- Sorting: newest upload first ----------
- * Ordering uses the SAME confirmed commit dates as the New badge above -
- * deliberately not the per-browser firstSeenAt guess, so every device
- * shows wallpapers in the same order instead of it depending on when each
- * visitor's own browser happened to first notice a file. That means real
- * order is only knowable for files this mechanism has actually seen added
- * within some past 7-day window - which, going forward, is every future
- * upload. The rest of the (pre-existing) collection has no cheap way to
+ * Ordering uses the SAME confirmed commit dates the New badge check above
+ * fetches (see DATE_CONFIRM_WINDOW_MS) - deliberately not the per-browser
+ * firstSeenAt guess, so every device shows wallpapers in the same order
+ * instead of it depending on when each visitor's own browser happened to
+ * first notice a file. That means real order is only knowable for files
+ * this mechanism has actually seen added within some past 30-day window -
+ * which, going forward, is every future upload. The rest of the
+ * (pre-existing) collection has no cheap way to
  * recover its true historical upload date - fetching that many individual
  * dates would blow through the API's rate limit - so those files simply
  * keep their previous relative order, placed after everything with a
@@ -3488,6 +3444,12 @@ const CONFIRMED_DATES_KEY = 'blapples-wallpaper-confirmed-dates-v1';
 // Anything the live GitHub check learns later (new uploads) still layers
 // on top of this at runtime; re-running the script and updating this
 // object folds those into the shared baseline too, whenever you want to.
+//
+// This block is regenerated automatically by scripts/backfill_dates.py,
+// run on a schedule by .github/workflows/backfill-wallpaper-dates.yml -
+// hand edits between the markers below will just get overwritten on the
+// next scheduled run.
+// AUTO-GENERATED:BASELINE_CONFIRMED_DATES:START
 const BASELINE_CONFIRMED_DATES = {
   "104902659_p0.jpg": 1786888839000,
   "1099713.jpg": 1786888839000,
@@ -3690,6 +3652,7 @@ const BASELINE_CONFIRMED_DATES = {
   "wwdc-2026-glow-all-3840x2160-26628.png": 1786857139000,
   "yande.re 1255699 sample fishnets luminaria_pro maimiya_rinne mui_maru wallpaper_upscayl_2x_ultrasharp-4x.png": 1786857139000,
 };
+// AUTO-GENERATED:BASELINE_CONFIRMED_DATES:END
 
 function readConfirmedDates(){
   let dates = {...BASELINE_CONFIRMED_DATES};
@@ -3762,7 +3725,13 @@ async function applyGitHistoryNewFlags(frames){
   }
   let changed = false;
   frames.forEach(frame=>{
-    const isNew = !!(frame.filename && frame.filename in added);
+    // `added` now covers a 30-day window (DATE_CONFIRM_WINDOW_MS) so sort
+    // dates have a longer runway to get confirmed - see that constant's
+    // comment. The "New" badge itself still needs the stricter 7-day
+    // NEW_WINDOW_MS, so that's checked explicitly here rather than just
+    // membership in `added`.
+    const addedDate = frame.filename ? added[frame.filename] : undefined;
+    const isNew = addedDate != null && (Date.now() - addedDate) < NEW_WINDOW_MS;
     if(frame.isNew !== isNew){
       frame.isNew = isNew;
       changed = true;
@@ -4154,8 +4123,9 @@ function ensureColorChip(colorKey){
   btn.className = 'color-chip';
   btn.dataset.color = colorKey;
   btn.setAttribute('aria-pressed','false');
+  btn.setAttribute('aria-label', meta.label);
   btn.innerHTML =
-    `<span class="color-chip-swatch" style="background:${meta.swatch}" aria-hidden="true"></span>${meta.label}<span class="color-chip-count"></span>`;
+    `<span class="color-chip-swatch" style="background:${meta.swatch}" aria-hidden="true"></span><span class="color-chip-label">${meta.label}</span><span class="color-chip-count"></span>`;
   btn.addEventListener('click', ()=> setActiveColor(colorKey));
   colorChipEls.set(colorKey, btn);
 
@@ -4230,6 +4200,11 @@ function resetColorFilterUI(total){
   }
   updateChipStates();
   updateNewSectionVisibility();
+
+  const countChip = document.getElementById('wallpaperCountChip');
+  if(countChip){
+    countChip.textContent = total ? `${total} wallpaper${total===1?'':'s'}` : 'Curated gallery';
+  }
 }
 
 async function computeAllFrameColors(frames, generation){
@@ -5781,175 +5756,42 @@ function fireConfetti(originEl, count=26){
   });
 }
 
-/* ---------- Responsive header behavior ---------- */
-const topbar = document.querySelector('.topbar');
-const headerPlaceholder = document.getElementById('headerPlaceholder');
+/* ---------- Header + back-to-top behavior ----------
+   The header no longer shrinks into a compact floating bar on scroll —
+   it just stays put at the top of the page like a normal header. All
+   that's left here is the small "back to top" button that appears once
+   you've scrolled a bit on mobile. The color filter chips no longer live
+   in this header at all — see the "Colors" popover wiring further down,
+   which is where #colorFilter now permanently lives. */
 const mobileTopBtn = document.getElementById('mobileTopBtn');
-const colorFilter = document.getElementById('colorFilter');
-const colorFilterHome = colorFilter.parentNode;
-// Its original next sibling (the New Wallpapers section) - captured once,
-// up front, so moveFilterBack() can restore the filter chips to exactly
-// where they started. This used to hardcode "insert right before #grid"
-// instead, which skipped past the New Wallpapers section - harmless while
-// that section is empty/hidden, but the moment it has real content, a
-// single scroll-down-then-up cycle would silently leave the filter chips
-// stranded below it instead of back at the top, reading as "the filters
-// are just gone" since nobody's looking for them down there.
-const colorFilterAnchor = colorFilter.nextSibling;
 const mobileLayout = window.matchMedia('(max-width: 640px)');
-let lastScrollY = window.scrollY;
-let headerTicking = false;
 
-function moveFilterIntoHeader(){
-  if(colorFilter.parentNode !== topbar) topbar.appendChild(colorFilter);
-}
-function moveFilterBack(){
-  if(colorFilter.parentNode !== colorFilterHome){
-    colorFilterHome.insertBefore(colorFilter, colorFilterAnchor);
-  }
+function updateBackToTopButton(){
+  if(!mobileTopBtn) return;
+  mobileTopBtn.classList.toggle('visible', mobileLayout.matches && window.scrollY > 300);
 }
 
-function updateHeaderOnScroll(){
-  const y = window.scrollY;
-  const delta = y - lastScrollY;
-  const isMobile = mobileLayout.matches;
-
-  if(isMobile){
-    // Exact mobile behavior from blapples-wallpaper-collection-scroll-header(1).
-    moveFilterBack();
-    topbar.classList.remove('is-compact');
-    if(y > 180 && delta > 0){
-      topbar.classList.add('is-mobile-hidden');
-      mobileTopBtn.classList.add('visible');
-    }else if(delta < 0 && y < 80){
-      topbar.classList.remove('is-mobile-hidden');
-      mobileTopBtn.classList.remove('visible');
-    }else if(delta < 0){
-      mobileTopBtn.classList.add('visible');
-    }
-  }else{
-    // Exact desktop compact-header behavior from the reference file.
-    const compactThreshold = 90;
-    if(y > compactThreshold){
-      if(!topbar.classList.contains('is-compact')){
-        const rect = topbar.getBoundingClientRect();
-        headerPlaceholder.style.height = `${rect.height + 46}px`;
-        headerPlaceholder.style.display = 'block';
-      }
-      moveFilterIntoHeader();
-      topbar.classList.add('is-compact');
-    }else{
-      topbar.classList.remove('is-compact');
-      moveFilterBack();
-      headerPlaceholder.style.display = 'none';
-      headerPlaceholder.style.height = '0px';
-    }
-  }
-
-  lastScrollY = y;
-  headerTicking = false;
-}
-
+let backToTopTicking = false;
 window.addEventListener('scroll', ()=>{
-  if(!headerTicking){
-    headerTicking = true;
-    requestAnimationFrame(updateHeaderOnScroll);
+  if(!backToTopTicking){
+    backToTopTicking = true;
+    requestAnimationFrame(()=>{ updateBackToTopButton(); backToTopTicking = false; });
   }
 },{passive:true});
 
 window.addEventListener('resize', ()=>{
-  // Re-evaluate the complete header/filter layout after a resize so switching
-  // between desktop, tablet and mobile breakpoints never leaves the filter
-  // in the wrong container. Coalesced onto the same rAF-guarded flag as the
-  // scroll handler above, since a window drag-resize can fire this event
-  // many times per frame and the work here includes a getBoundingClientRect
-  // read plus DOM moves.
-  if(!headerTicking){
-    headerTicking = true;
-    requestAnimationFrame(updateHeaderOnScroll);
+  if(!backToTopTicking){
+    backToTopTicking = true;
+    requestAnimationFrame(()=>{ updateBackToTopButton(); backToTopTicking = false; });
   }
 },{passive:true});
 
-mobileTopBtn.addEventListener('click', ()=>{
+mobileTopBtn?.addEventListener('click', ()=>{
   window.scrollTo({top:0,behavior:'smooth'});
-  topbar.classList.remove('is-mobile-hidden');
   mobileTopBtn.classList.remove('visible');
 });
 
-/* Mobile compact color-filter dock */
-const mobileColorDock = document.getElementById('mobileColorDock');
-const mobileColorDots = document.getElementById('mobileColorDots');
-
-function buildMobileColorDots(){
-  if(!mobileColorDots || typeof COLOR_BUCKETS === 'undefined') return;
-
-  mobileColorDots.innerHTML = '';
-
-  const all = document.createElement('button');
-  all.type = 'button';
-  all.className = 'mobile-color-dot';
-  all.dataset.color = 'all';
-  all.title = 'All colors';
-  all.setAttribute('aria-label','All colors');
-  all.addEventListener('click',()=>setActiveColor('all'));
-  mobileColorDots.appendChild(all);
-
-  COLOR_BUCKETS.forEach(meta=>{
-    const dot = document.createElement('button');
-    dot.type = 'button';
-    dot.className = 'mobile-color-dot';
-    dot.dataset.color = meta.key;
-    dot.title = meta.label;
-    dot.setAttribute('aria-label',meta.label);
-    dot.style.background = meta.swatch;
-    dot.addEventListener('click',()=>setActiveColor(meta.key));
-    mobileColorDots.appendChild(dot);
-  });
-
-  updateMobileColorDots();
-}
-
-function updateMobileColorDots(){
-  if(!mobileColorDots) return;
-  mobileColorDots.querySelectorAll('.mobile-color-dot').forEach(dot=>{
-    const active = dot.dataset.color === 'all'
-      ? activeColor === null
-      : dot.dataset.color === activeColor;
-    dot.classList.toggle('is-active',active);
-    dot.setAttribute('aria-pressed',String(active));
-  });
-}
-
-const mobileColorOriginalSetActiveColor = setActiveColor;
-setActiveColor = function(key){
-  mobileColorOriginalSetActiveColor(key);
-  updateMobileColorDots();
-};
-
-buildMobileColorDots();
-
-let mobileColorDockTicking = false;
-window.addEventListener('scroll',()=>{
-  if(mobileColorDockTicking) return;
-  mobileColorDockTicking = true;
-
-  requestAnimationFrame(()=>{
-    if(mobileLayout.matches){
-      document.body.classList.toggle('mobile-color-dock-visible',window.scrollY > 180);
-    }else{
-      document.body.classList.remove('mobile-color-dock-visible');
-    }
-    mobileColorDockTicking = false;
-  });
-},{passive:true});
-
-window.addEventListener('resize',()=>{
-  if(!mobileLayout.matches){
-    document.body.classList.remove('mobile-color-dock-visible');
-  }
-},{passive:true});
-
-updateHeaderOnScroll();
+updateBackToTopButton();
 </script>
 
 <script>
@@ -6476,6 +6318,173 @@ async function openWallpaperFromDeepLink(filename){
 const deepLinkWallpaper = new URLSearchParams(window.location.search).get('wallpaper');
 if(deepLinkWallpaper) openWallpaperFromDeepLink(deepLinkWallpaper);
 </script>
+
+<script>
+/* ---------- Bottom nav wiring ---------- */
+(() => {
+  const navHome = document.getElementById('navHome');
+  const navGallery = document.getElementById('navGallery');
+  const navMore = document.getElementById('navMore');
+  const navPresets = document.getElementById('navPresets');
+  const navButtons = { home:navHome, gallery:navGallery, more:navMore };
+  if(!navHome) return;
+
+  const gridEl = document.getElementById('grid');
+  const headerEl = document.querySelector('.topbar');
+  const moreSheet = document.getElementById('moreSheet');
+  const mobileDock = document.getElementById('mobileDock');
+  let lastScrollKey = 'home';
+  let openSheetKey = null; // 'more' | null
+
+  function setActiveNav(key, remember){
+    Object.entries(navButtons).forEach(([k,btn])=>{
+      if(btn) btn.classList.toggle('is-active', k===key);
+    });
+    if(remember !== false) lastScrollKey = key;
+  }
+
+  function closeSheets(){
+    if(moreSheet && !moreSheet.hidden){
+      moreSheet.hidden = true;
+      navMore.setAttribute('aria-expanded','false');
+    }
+    if(openSheetKey){
+      openSheetKey = null;
+      setActiveNav(lastScrollKey);
+    }
+  }
+
+  function openSheet(key){
+    closeSheets();
+    if(key === 'more'){
+      if(!moreSheet) return;
+      if(typeof syncMoreSheetState === 'function') syncMoreSheetState();
+      // Anchor the popover just above the dock (color strip + nav bar)
+      // rather than a fixed pixel offset, since the strip's height shifts
+      // as color chips are discovered and wrap onto more/fewer rows.
+      if(mobileDock){
+        const dockRect = mobileDock.getBoundingClientRect();
+        moreSheet.style.bottom = Math.round(window.innerHeight - dockRect.top + 14) + 'px';
+      }
+      moreSheet.hidden = false;
+      navMore.setAttribute('aria-expanded','true');
+      setActiveNav('more', false);
+    }
+    openSheetKey = key;
+  }
+
+  navHome.addEventListener('click', ()=>{
+    closeSheets();
+    setActiveNav('home');
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+
+  navGallery.addEventListener('click', ()=>{
+    closeSheets();
+    setActiveNav('gallery');
+    gridEl?.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+
+  let syncMoreSheetState = null;
+  if(moreSheet){
+    const moreSoundBtn = document.getElementById('moreSoundBtn');
+    const moreRoastBtn = document.getElementById('moreRoastBtn');
+
+    syncMoreSheetState = function(){
+      const soundBtn = document.getElementById('soundToggleBtn');
+      const roastBtn = document.getElementById('roastToggleBtn');
+      moreSoundBtn?.classList.toggle('is-active', !!soundBtn?.classList.contains('is-active'));
+      moreRoastBtn?.classList.toggle('is-active', !!roastBtn?.classList.contains('is-active'));
+    };
+
+    navMore.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(openSheetKey === 'more') closeSheets();
+      else openSheet('more');
+    });
+
+    moreSoundBtn?.addEventListener('click', ()=>{
+      document.getElementById('soundToggleBtn')?.click();
+      syncMoreSheetState();
+    });
+    moreRoastBtn?.addEventListener('click', ()=>{
+      document.getElementById('roastToggleBtn')?.click();
+      syncMoreSheetState();
+      closeSheets();
+    });
+  }
+
+  navPresets?.addEventListener('click', ()=> closeSheets());
+
+  /* Keep Surprise Me clear of the color-filter dock. Its height now
+     changes as color chips wrap onto more/fewer rows (colors are
+     discovered async, and phone widths vary), so the FAB's old fixed
+     bottom offset would drift out of sync and start overlapping it.
+     Anchor it above the dock's actual top instead, same trick as the
+     More popover above, and keep it live via ResizeObserver so it
+     tracks the strip as chips arrive. */
+  const surpriseFab = document.getElementById('surpriseBtn');
+  if(surpriseFab && mobileDock){
+    const syncFabPosition = () => {
+      if(window.innerWidth > 640){
+        surpriseFab.style.bottom = '';
+        return;
+      }
+      const dockRect = mobileDock.getBoundingClientRect();
+      surpriseFab.style.bottom = Math.round(window.innerHeight - dockRect.top + 14) + 'px';
+    };
+    if('ResizeObserver' in window){
+      new ResizeObserver(syncFabPosition).observe(mobileDock);
+    }
+    window.addEventListener('resize', syncFabPosition);
+    syncFabPosition();
+  }
+
+  document.addEventListener('click', (e)=>{
+    if(!openSheetKey) return;
+    if(moreSheet?.contains(e.target) || navMore?.contains(e.target)) return;
+    closeSheets();
+  });
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape') closeSheets();
+  });
+
+  /* The header already holds Sound/Roast/Widget Presets, so "Options" and
+     "Presets" in the bottom nav are only useful once the header has
+     scrolled out of view — while the header is visible, both buttons hide
+     themselves (and Home/Gallery reflow to fill the space) rather than
+     sitting there duplicating controls you can already see above. */
+  if(headerEl && 'IntersectionObserver' in window){
+    const headerObserver = new IntersectionObserver((entries)=>{
+      const headerVisible = entries[0].isIntersecting;
+      navMore.classList.toggle('is-collapsed', headerVisible);
+      navPresets?.classList.toggle('is-collapsed', headerVisible);
+      if(headerVisible && openSheetKey === 'more') closeSheets();
+    }, {threshold:0});
+    headerObserver.observe(headerEl);
+  }
+
+  /* Lightweight scroll-spy: Home vs Gallery, based on scroll position —
+     piggybacks on scroll rather than adding its own IntersectionObserver.
+     Paused while a popover is open so scrolling the popover's own content
+     can't steal the active highlight. */
+  function updateNavScrollSpy(){
+    if(openSheetKey) return;
+    const key = window.scrollY < 120 ? 'home' : 'gallery';
+    if(!navHome.classList.contains('is-active') || key !== lastScrollKey){
+      setActiveNav(key);
+    }
+  }
+  let spyTicking = false;
+  window.addEventListener('scroll', ()=>{
+    if(!spyTicking){
+      spyTicking = true;
+      requestAnimationFrame(()=>{ updateNavScrollSpy(); spyTicking = false; });
+    }
+  }, {passive:true});
+})();
+</script>
+
 
 </body>
 </html>
