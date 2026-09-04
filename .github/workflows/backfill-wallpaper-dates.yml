@@ -1,0 +1,59 @@
+name: Backfill wallpaper confirmed dates
+
+# Keeps BASELINE_CONFIRMED_DATES in index.html up to date with real git
+# history from the wallpapers repo, so sort order (newest upload first)
+# stays correct for every visitor even after a wallpaper ages out of the
+# site's own 30-day live-confirmation window (see DATE_CONFIRM_WINDOW_MS
+# and the "Sorting: newest upload first" comment in index.html).
+#
+# Runs on a schedule so this never needs a manual paste again, and can
+# also be triggered by hand from the Actions tab (workflow_dispatch).
+
+on:
+  schedule:
+    # Every Monday at 04:17 UTC. Comfortably more often than the 30-day
+    # confirmation window, so nothing should ever be able to age out
+    # in between two runs. Pick any time - the exact minute doesn't matter,
+    # just avoid the top of the hour when everyone else's cron jobs fire.
+    - cron: '17 4 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout website repo
+        uses: actions/checkout@v4
+        with:
+          path: website
+
+      - name: Checkout wallpapers repo (full history)
+        uses: actions/checkout@v4
+        with:
+          repository: Blapples/wallpapers
+          path: wallpapers
+          fetch-depth: 0   # full history - a shallow clone would only see each file's LATEST commit, never its true first-added date
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run backfill script
+        run: python3 website/wallpaper/scripts/backfill_dates.py --repo wallpapers --apply website/wallpaper/index.html
+
+      - name: Commit changes if any
+        working-directory: website
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- wallpaper/index.html; then
+            echo "No changes - baseline is already up to date."
+            exit 0
+          fi
+          git add wallpaper/index.html
+          git commit -m "chore: backfill wallpaper confirmed dates"
+          git push
