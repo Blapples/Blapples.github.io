@@ -259,6 +259,54 @@
   #soundToggleBtn.is-active .icon-sound-on{display:block}
   #soundToggleBtn.is-active .icon-sound-off{display:none}
 
+  /* Sort control - the trigger is a plain .icon-btn.back-link, same shape
+     as the Widget Presets pill right next to it (icon + label), so it
+     doesn't introduce a new button shape into the topbar. The dropdown
+     itself is a small custom glass panel matching .more-sheet's styling
+     (see that rule) rather than a native <select> menu, since a native
+     menu can't be restyled to match and looks out of place next to
+     everything else here. */
+  .sort-menu{position:relative}
+  .sort-menu-chevron{width:13px;height:13px;margin-left:-3px;transition:transform .2s ease}
+  .sort-menu-btn[aria-expanded="true"] .sort-menu-chevron{transform:rotate(180deg)}
+  .sort-menu-panel{
+    position:absolute;
+    top:calc(100% + 8px);
+    right:0;
+    z-index:40;
+    min-width:152px;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    padding:8px;
+    border-radius:18px;
+    background:var(--glass-fill-opaque);
+    border:1px solid var(--glass-border);
+    box-shadow:0 16px 40px rgba(0,0,0,.5),var(--glass-sheen);
+    backdrop-filter:blur(30px) saturate(1.6);
+    -webkit-backdrop-filter:blur(30px) saturate(1.6);
+    animation:dialog-in .2s var(--spring);
+    contain:layout style;
+  }
+  .sort-menu-panel[hidden]{display:none}
+  .sort-menu-item{
+    display:flex;
+    align-items:center;
+    width:100%;
+    padding:10px 12px;
+    border-radius:12px;
+    background:transparent;
+    border:0;
+    color:var(--md-on-surface);
+    font-size:13.5px;
+    font-weight:650;
+    text-align:left;
+    cursor:pointer;
+    transition:background .2s ease;
+  }
+  .sort-menu-item:hover{background:var(--glass-fill-strong)}
+  .sort-menu-item.is-active{color:var(--md-primary)}
+
   /* Color filter — Material Expressive filter-chip row for narrowing the
      gallery to wallpapers that share a dominant color. Colors are sampled
      client-side (see computeFrameColor) and bucketed into a fixed palette,
@@ -699,6 +747,15 @@
     gap:8px;
     width:min(440px,calc(100% - 24px));
     padding-bottom:env(safe-area-inset-bottom);
+    /* Perf: this is fixed-position and blurred (backdrop-filter, on its
+       children), so it's re-composited on every scroll frame no matter
+       what. contain isolates its own layout/paint from the rest of the
+       page (and vice versa) so recalculating it never has to touch
+       anything else; will-change nudges it onto its own GPU layer a
+       little more reliably than the transform above already does alone.
+       Neither changes anything visually. */
+    contain:layout style;
+    will-change:transform;
   }
 
   /* ---------- Color strip ----------
@@ -905,6 +962,7 @@
     backdrop-filter:blur(30px) saturate(1.6);
     -webkit-backdrop-filter:blur(30px) saturate(1.6);
     animation:dialog-in .25s var(--spring);
+    contain:layout style;
   }
   .more-sheet-item{
     display:flex;
@@ -982,6 +1040,10 @@
     animation:dialog-in .45s var(--spring);
     transition:background .5s ease,border-color .5s ease,box-shadow .5s ease,
                width .4s var(--spring),max-height .4s var(--spring);
+    /* Perf: isolates the carousel drag/prev-next updates happening inside
+       here (frequent transform changes while dragging) from ever
+       triggering layout checks on the rest of the page, and vice versa. */
+    contain:layout style;
   }
 
   @keyframes dialog-in{
@@ -1542,6 +1604,13 @@
       gap:0;
     }
     .topbar-toggles .icon-btn.back-link span{
+      display:none;
+    }
+
+    /* The sort button reuses .back-link's exact shape/collapse above (it
+       has that class too), so only its extra chevron icon needs hiding
+       here - the label span already collapses via the rule above. */
+    .topbar-toggles .sort-menu-chevron{
       display:none;
     }
 
@@ -2666,6 +2735,19 @@
         <span id="wallpaperCountChip">Curated gallery</span>
       </span>
       <div class="topbar-toggles">
+        <div class="sort-menu" id="sortMenu">
+          <button type="button" class="icon-btn back-link sort-menu-btn" id="sortMenuBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Sort wallpapers">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
+            <span id="sortMenuLabel">Newest</span>
+            <svg class="sort-menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="sort-menu-panel" id="sortMenuPanel" role="listbox" aria-label="Sort wallpapers" hidden>
+            <button type="button" class="sort-menu-item is-active" data-sort="newest" role="option" aria-selected="true">Newest</button>
+            <button type="button" class="sort-menu-item" data-sort="oldest" role="option" aria-selected="false">Oldest</button>
+            <button type="button" class="sort-menu-item" data-sort="az" role="option" aria-selected="false">A–Z</button>
+            <button type="button" class="sort-menu-item" data-sort="za" role="option" aria-selected="false">Z–A</button>
+          </div>
+        </div>
         <button type="button" class="icon-btn is-active" id="soundToggleBtn" aria-pressed="true" aria-label="Turn sound effects off">
           <svg class="icon-sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
           <svg class="icon-sound-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
@@ -3707,6 +3789,72 @@ function sortFramesByRecency(frames){
     .map(x => x.frame);
 }
 
+/* ---------- Sort control (Newest / Oldest / A-Z / Z-A) ----------
+ * A visitor-facing companion to sortFramesByRecency above: that function
+ * always wins on first render (and after every git-history refresh) since
+ * "newest first" is the default, but once someone picks a different mode
+ * from the sort control, applySortMode() below takes over and just
+ * reorders whatever's already in `latestFrames` - no re-fetch, no
+ * rebuilding cards, same DOM-reordering trick applyGitHistoryNewFlags
+ * already uses. Dated-vs-undated handling for Oldest mirrors Newest (an
+ * undated wallpaper's real age is unknown, so it isn't confidently placed
+ * at either end - it keeps its original relative spot, after every dated
+ * one). A-Z/Z-A need no date at all, so those two ignore confirmed dates
+ * entirely and are exact with every wallpaper. */
+function sortFramesByOldest(frames){
+  const dates = readConfirmedDates();
+  return frames
+    .map((frame, i) => ({
+      frame, i,
+      date: frame.filename && frame.filename in dates ? dates[frame.filename] : null,
+    }))
+    .sort((a, b) => {
+      if(a.date != null && b.date != null) return a.date - b.date;
+      if(a.date != null) return -1;
+      if(b.date != null) return 1;
+      return a.i - b.i;
+    })
+    .map(x => x.frame);
+}
+
+function sortFramesAlphabetically(frames, direction){
+  const sign = direction === 'za' ? -1 : 1;
+  return frames
+    .map((frame, i) => ({frame, i}))
+    .sort((a, b) => {
+      const cmp = (a.frame.title || '').localeCompare(b.frame.title || '', undefined, {numeric:true, sensitivity:'base'});
+      return cmp !== 0 ? sign * cmp : a.i - b.i; // stable tie-break
+    })
+    .map(x => x.frame);
+}
+
+// The full frame list from the most recent render, kept around so the sort
+// control can reorder without a re-fetch. Stays in sync with whatever
+// order is authoritative at the time - see renderFrames() and
+// applyGitHistoryNewFlags() above, both of which update this.
+let latestFrames = [];
+let currentSortMode = 'newest';
+
+function sortFramesByMode(frames, mode){
+  switch(mode){
+    case 'oldest': return sortFramesByOldest(frames);
+    case 'az': return sortFramesAlphabetically(frames, 'az');
+    case 'za': return sortFramesAlphabetically(frames, 'za');
+    case 'newest':
+    default: return sortFramesByRecency(frames);
+  }
+}
+
+// Reorders the cards already in the grid to match the given mode, without
+// touching the New Wallpapers spotlight section above it (that section is
+// deliberately always newest-first - see its own comment near
+// renderNewSection) or any card's color-filter visibility.
+function applySortMode(mode){
+  currentSortMode = mode;
+  const sorted = sortFramesByMode(latestFrames, mode);
+  sorted.forEach(frame => { if(frame._card) grid.appendChild(frame._card); });
+}
+
 // Runs after the authoritative GitHub manifest is already rendered (with
 // the localStorage-based isNew guess). Once the real commit-history answer
 // comes back, this corrects any frame whose guess was wrong - most
@@ -3748,7 +3896,16 @@ async function applyGitHistoryNewFlags(frames){
   // all mean there's a more up-to-date order available than whatever the
   // page happened to render first.
   const sorted = sortFramesByRecency(frames);
-  sorted.forEach(frame => { if(frame._card) grid.appendChild(frame._card); });
+  latestFrames = sorted;
+  // If the visitor has picked something other than the default (Newest)
+  // from the sort control, keep respecting that choice instead of
+  // silently snapping back to newest-first the moment fresher dates come
+  // in - re-apply the active mode against the just-updated data instead.
+  if(currentSortMode === 'newest'){
+    sorted.forEach(frame => { if(frame._card) grid.appendChild(frame._card); });
+  }else{
+    applySortMode(currentSortMode);
+  }
 
   if(!changed) return;
   // Bug fix: this used to pass the original, un-resorted `frames` here,
@@ -4209,7 +4366,11 @@ function resetColorFilterUI(total){
 
 async function computeAllFrameColors(frames, generation){
   const cache=readColorCache();
-  const CONCURRENCY=6;
+  // Fewer parallel decodes on phones - weaker CPUs, and this runs during
+  // initial load right when the page has the most other work to do.
+  // Total work and the result are identical either way, just paced
+  // differently.
+  const CONCURRENCY=IS_MOBILE_DEVICE ? 3 : 6;
   let idx=0, cacheDirty=false;
   async function worker(){
     while(idx<frames.length){
@@ -4339,6 +4500,67 @@ function setSoundEnabled(on){
 if(soundToggleBtn){
   setSoundEnabled(soundEnabled);
   soundToggleBtn.addEventListener('click', ()=> setSoundEnabled(!soundEnabled));
+}
+
+/* ---------- Sort control ----------
+ * Newest is the default and needs no user action - it's what
+ * sortFramesByRecency already produces on every render. Picking anything
+ * else here just reorders the cards already in the grid (see
+ * applySortMode above); it doesn't touch the New Wallpapers spotlight
+ * section, which intentionally always stays newest-first regardless of
+ * this control, since its whole purpose is surfacing what just shipped.
+ *
+ * The dropdown itself is a small custom glass panel (not a native
+ * <select>), toggled the same way the bottom-nav's Options sheet is:
+ * a button with aria-expanded, a panel that opens/closes, and a
+ * document-level listener that closes it on an outside click or Escape. */
+const SORT_MODE_LABELS = { newest:'Newest', oldest:'Oldest', az:'A–Z', za:'Z–A' };
+const sortMenu = document.getElementById('sortMenu');
+const sortMenuBtn = document.getElementById('sortMenuBtn');
+const sortMenuLabel = document.getElementById('sortMenuLabel');
+const sortMenuPanel = document.getElementById('sortMenuPanel');
+if(sortMenu && sortMenuBtn && sortMenuPanel){
+  const sortMenuItems = Array.from(sortMenuPanel.querySelectorAll('.sort-menu-item'));
+
+  const closeSortMenu = () => {
+    sortMenuPanel.hidden = true;
+    sortMenuBtn.setAttribute('aria-expanded','false');
+  };
+  const openSortMenu = () => {
+    sortMenuPanel.hidden = false;
+    sortMenuBtn.setAttribute('aria-expanded','true');
+  };
+
+  sortMenuBtn.addEventListener('click', () => {
+    if(sortMenuPanel.hidden) openSortMenu(); else closeSortMenu();
+  });
+
+  sortMenuItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const mode = item.dataset.sort in SORT_MODE_LABELS ? item.dataset.sort : 'newest';
+      applySortMode(mode);
+      if(sortMenuLabel) sortMenuLabel.textContent = SORT_MODE_LABELS[mode];
+      sortMenuItems.forEach(other => {
+        const active = other === item;
+        other.classList.toggle('is-active', active);
+        other.setAttribute('aria-selected', String(active));
+      });
+      closeSortMenu();
+      sortMenuBtn.focus();
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if(sortMenuPanel.hidden) return;
+    if(sortMenu.contains(e.target)) return;
+    closeSortMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape' && !sortMenuPanel.hidden){
+      closeSortMenu();
+      sortMenuBtn.focus();
+    }
+  });
 }
 
 /* ---------- Click-triggered card pounce ----------
@@ -4711,11 +4933,17 @@ function renderFrames(frames, usingPlaceholders=false, isAuthoritative=true){
     // previous session already learned (see sortFramesByRecency above).
     // Anything without a confirmed date yet keeps its original order.
     frames = sortFramesByRecency(frames);
+    latestFrames = frames;
   }
 
   grid.innerHTML = '';
   Object.keys(frameData).forEach(key => delete frameData[key]);
-  buildCardsChunked(frames, usingPlaceholders, IS_MOBILE_DEVICE ? 6 : 12, generation);
+  buildCardsChunked(frames, usingPlaceholders, IS_MOBILE_DEVICE ? 6 : 12, generation, () => {
+    // A visitor's chosen sort mode (see the sort control) survives a
+    // manifest re-render - e.g. the background GitHub refresh in init()
+    // below - instead of silently resetting to Newest each time.
+    if(!usingPlaceholders && currentSortMode !== 'newest') applySortMode(currentSortMode);
+  });
 
   renderNewSection(usingPlaceholders ? [] : frames);
 
@@ -4839,7 +5067,7 @@ function buildCard(frame, idx, usingPlaceholders){
   revealObserver.observe(card);
 }
 
-function buildCardsChunked(frames, usingPlaceholders, chunkSize=12, generation=renderGeneration){
+function buildCardsChunked(frames, usingPlaceholders, chunkSize=12, generation=renderGeneration, onDone){
   let i = 0;
   function step(){
     // Stop immediately if another render has replaced this manifest.
@@ -4850,6 +5078,7 @@ function buildCardsChunked(frames, usingPlaceholders, chunkSize=12, generation=r
       buildCard(frames[i], i, usingPlaceholders);
     }
     if(i < frames.length) requestAnimationFrame(step);
+    else if(onDone) onDone();
   }
   step();
 }
