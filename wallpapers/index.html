@@ -3229,20 +3229,6 @@ function writeWallpaperCache(frames){
 const NEW_TRACKING_KEY = 'blapples-wallpaper-first-seen-v1';
 const NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 
-// How far back the git-history check (below) looks when confirming upload
-// dates for SORT ORDER, as opposed to the "New" badge above. These used to
-// share the same 7-day window, which caused a real bug: a wallpaper's sort
-// date could only ever be confirmed by a live GitHub check while it was
-// still within its first 7 days. If no browser happened to visit (and thus
-// cache that confirmed date) during that window - and the baked-in
-// BASELINE_CONFIRMED_DATES snapshot hadn't been regenerated since - the
-// wallpaper aged out of "new" with no confirmed date at all, and
-// sortFramesByRecency() dropped it to the very bottom of the grid instead
-// of keeping it near the top. Giving date-confirmation a much longer
-// runway than the badge's 7 days makes that far less likely, without
-// changing how long the "New" badge itself shows.
-const DATE_CONFIRM_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-
 function readFirstSeenMap(){
   try{
     const raw = localStorage.getItem(NEW_TRACKING_KEY);
@@ -3324,450 +3310,58 @@ function trackNewWallpapers(frames, isAuthoritative=true){
  * applyGitHistoryNewFlags below); the guess above still handles the very
  * first, instant paint before this network round-trip finishes.
  */
-const NEW_COMMITS_CACHE_KEY = 'blapples-wallpaper-recent-commits-v5';
-// An hour is plenty fresh for confirming upload dates within a 30-day
-// window, and keeps a burst of page loads from re-walking commit history
-// every single time.
-const NEW_COMMITS_CACHE_TTL_MS = 60 * 60 * 1000;
-
-function readRecentCommitsCache(){
-  try{
-    const raw = localStorage.getItem(NEW_COMMITS_CACHE_KEY);
-    if(!raw) return null;
-    const data = JSON.parse(raw);
-    if(!data || typeof data !== 'object' || !data.added || !(Date.now() - data.fetchedAt < NEW_COMMITS_CACHE_TTL_MS)){
-      return null;
-    }
-    return data.added; // filename -> commit date (ms)
-  }catch(err){
-    return null;
-  }
-}
-
-function writeRecentCommitsCache(added){
-  try{
-    localStorage.setItem(NEW_COMMITS_CACHE_KEY, JSON.stringify({fetchedAt: Date.now(), added}));
-  }catch(err){
-    // Non-fatal - just means the next load re-fetches instead of hitting cache.
-  }
-}
-
-/* ---------- Manifest fingerprint: invalidate the commits cache the moment
- * the repo actually changes, instead of only after the 1-hour TTL above.
- *
- * The gallery already fetches the live file list on every load (see
- * fetchWallpapersFromGitHub), so we get this "did anything change" signal
- * for free - no extra request needed. If the fingerprint differs from the
- * last time this browser checked, the cached "what's new" answer is stale
- * by definition (it was computed before this upload/deletion existed), so
- * we throw it away and let the normal fetchRecentlyAddedFilenames() call
- * hit GitHub fresh right away. If nothing changed, the fingerprint matches
- * and the existing 1-hour cache is left alone - so this never adds extra
- * API calls, it only ever removes an unnecessary wait.
+/* ---------- Confirmed dates: pre-generated manifest, not live GitHub calls ----------
+ * Blapples/wallpapers publishes manifest.json (see scripts/generate_manifest.py
+ * in that repo) - a plain static file, already stamped with each file's real
+ * git-add date and already sorted newest-first, generated server-side inside
+ * a GitHub Action (authenticated, so no rate-limit concern there) rather than
+ * computed live in every visitor's browser. This mirrors exactly how
+ * na-ive/wallpapers publishes wallpapers.json with a per-item `mtime` field -
+ * same idea, just named differently. Reading it costs one plain request to
+ * raw.githubusercontent.com, which isn't subject to the unauthenticated
+ * api.github.com rate limit at all, and needs no compare/boundary-commit
+ * dance the way a live check would.
  */
-const MANIFEST_FINGERPRINT_KEY = 'blapples-wallpaper-manifest-fingerprint-v1';
+const MANIFEST_URL = 'https://raw.githubusercontent.com/Blapples/wallpapers/main/manifest.json';
+const CONFIRMED_DATES_KEY = 'blapples-wallpaper-confirmed-dates-v2';  // v2: sourced from manifest.json, not live commit-walk
 
-function manifestFingerprint(frames){
-  // Cheap but effective: any add, delete, or rename changes either the
-  // count or the sorted filename list, so a real hash isn't necessary.
-  return frames.length + '|' + frames.map(f => f.filename).filter(Boolean).sort().join(',');
-}
+// In-memory cache for this page load - readConfirmedDates() (below) is
+// called synchronously in several places, so the async fetch happens once
+// up front (see applyGitHistoryNewFlags) and its result is stashed here.
+let manifestDates = null;
 
-function invalidateRecentCommitsCacheIfManifestChanged(frames){
-  try{
-    const fp = manifestFingerprint(frames);
-    const prev = localStorage.getItem(MANIFEST_FINGERPRINT_KEY);
-    // prev === null means this browser has never recorded a fingerprint
-    // (e.g. first-ever visit) - nothing to compare against, and there's no
-    // pre-existing cache in that case anyway, so just record it and move on.
-    if(prev !== null && prev !== fp){
-      localStorage.removeItem(NEW_COMMITS_CACHE_KEY);
+async function fetchManifestDates(){
+  const res = await fetch(MANIFEST_URL, { cache: 'no-store' });
+  if(!res.ok) throw new Error(`manifest.json responded ${res.status}`);
+  const data = await res.json();
+  const list = Array.isArray(data?.wallpapers) ? data.wallpapers : null;
+  if(!list) throw new Error('Unexpected manifest.json shape');
+
+  const dates = {};
+  list.forEach(e => {
+    if(e && typeof e.filename === 'string' && e.date){
+      const ts = new Date(e.date).getTime();
+      if(!Number.isNaN(ts)) dates[e.filename] = ts;
     }
-    localStorage.setItem(MANIFEST_FINGERPRINT_KEY, fp);
-  }catch(err){
-    // Non-fatal - worst case, the plain 1-hour TTL above still applies.
-  }
-}
-
-async function fetchRecentlyAddedFilenames(){
-  const cached = readRecentCommitsCache();
-  if(cached) return cached;
-
-  const {user, repo, path, branch} = GITHUB_SOURCE;
-  // Widened to DATE_CONFIRM_WINDOW_MS (30 days) rather than NEW_WINDOW_MS
-  // (7 days) - see the comment on DATE_CONFIRM_WINDOW_MS above. Whether a
-  // file is new enough for the badge is still decided separately, against
-  // the stricter NEW_WINDOW_MS, wherever this result is used.
-  const since = new Date(Date.now() - DATE_CONFIRM_WINDOW_MS).toISOString();
-  const pathParam = path ? `&path=${encodeURIComponent(path)}` : '';
-  const listUrl = `https://api.github.com/repos/${user}/${repo}/commits?sha=${encodeURIComponent(branch)}&since=${since}${pathParam}&per_page=100`;
-
-  const res = await fetch(listUrl, { headers:{ Accept:'application/vnd.github+json' } });
-  if(!res.ok) throw new Error(`GitHub commits API responded ${res.status}`);
-  const commits = await res.json();
-  if(!Array.isArray(commits)) throw new Error('Unexpected GitHub commits response');
-
-  // Wallpapers live at the repo root. The /presets subfolder shares this
-  // same repo (screenshots, meta.json, preset .json files) and commits
-  // there would otherwise get miscounted as "new wallpapers". Only
-  // root-level image files count.
-  const PRESETS_SUBFOLDER = 'presets/';
-  const WALLPAPER_IMAGE_EXT = /\.(png|jpe?g|webp|gif)$/i;
-  const added = {};
-
-  if(!commits.length){
-    writeRecentCommitsCache(added);
-    return added;
-  }
-
-  // A previous version of this check fetched every commit's full detail
-  // individually — up to 40 extra requests against the unauthenticated,
-  // 60/hour GitHub API. GitHub's "compare" endpoint returns the combined
-  // file diff across an entire commit range in ONE request instead, so
-  // this costs only 2-3 requests total no matter how many commits are in
-  // the window.
-  //
-  // Compare needs a "base" commit — the point right BEFORE the window
-  // started — to diff against. Using the oldest in-window commit's own
-  // .parents[0] field seemed reasonable but is fragile: when there's only
-  // one commit in the window (exactly the case where you just uploaded a
-  // single new wallpaper), a missing/empty parents field falls back to
-  // using that SAME commit as its own base — and compare() only shows
-  // changes AFTER the base, so that commit's own additions silently
-  // vanish from the diff. That's what was causing a wallpaper to flash as
-  // new (from the local guess) and then get demoted once the "official"
-  // check came back with nothing.
-  //
-  // Fixed by asking GitHub directly for the real boundary commit instead
-  // of trusting the parents field.
-  const head = commits[0].sha;
-  const boundaryUrl = `https://api.github.com/repos/${user}/${repo}/commits?sha=${encodeURIComponent(branch)}&until=${since}${pathParam}&per_page=1`;
-  const boundaryRes = await fetch(boundaryUrl, { headers:{ Accept:'application/vnd.github+json' } });
-  if(!boundaryRes.ok) throw new Error(`GitHub boundary-commit lookup responded ${boundaryRes.status}`);
-  const boundaryCommits = await boundaryRes.json();
-  if(!Array.isArray(boundaryCommits)) throw new Error('Unexpected GitHub boundary-commit response');
-  // No commit exists before the window at all (the repo's whole history
-  // fits inside the last 30 days) - nothing to diff against, so every
-  // in-window commit's additions are genuinely new by definition.
-  const base = boundaryCommits[0] ? boundaryCommits[0].sha : null;
-
-  const headDateStr = commits[0].commit?.author?.date || commits[0].commit?.committer?.date;
-  // The compare endpoint gives one combined file list, not a date per file,
-  // so every newly-added file here is stamped with the most recent commit's
-  // date. That only affects sort order *within* the New section (which of
-  // several new wallpapers shows first) — whether something counts as
-  // "new" at all is still exactly determined by the `since` filter above.
-  const approxDate = headDateStr ? new Date(headDateStr).getTime() : Date.now();
-
-  let files;
-  if(base){
-    const compareUrl = `https://api.github.com/repos/${user}/${repo}/compare/${base}...${head}`;
-    const cmpRes = await fetch(compareUrl, { headers:{ Accept:'application/vnd.github+json' } });
-    if(!cmpRes.ok) throw new Error(`GitHub compare API responded ${cmpRes.status}`);
-    const cmp = await cmpRes.json();
-    files = cmp.files || [];
-  }else{
-    // Whole-history edge case - fetch the single oldest commit's own
-    // detail directly (cheap: this only ever runs once for a brand new
-    // repo, not on every check) since there's no earlier point to diff
-    // against, then compare that commit forward to head for everything
-    // after it, if anything.
-    const oldest = commits[commits.length - 1];
-    const [oldestDetailRes, cmpRes] = await Promise.all([
-      fetch(`https://api.github.com/repos/${user}/${repo}/commits/${oldest.sha}`, { headers:{ Accept:'application/vnd.github+json' } }),
-      head !== oldest.sha
-        ? fetch(`https://api.github.com/repos/${user}/${repo}/compare/${oldest.sha}...${head}`, { headers:{ Accept:'application/vnd.github+json' } })
-        : Promise.resolve(null),
-    ]);
-    const oldestDetail = oldestDetailRes.ok ? await oldestDetailRes.json() : null;
-    const cmp = cmpRes && cmpRes.ok ? await cmpRes.json() : null;
-    files = [...(oldestDetail?.files || []), ...(cmp?.files || [])];
-  }
-
-  files.forEach(f => {
-    // Only a file actually being added counts as new - an edit or rename
-    // of an existing wallpaper shouldn't relaunch it as "new" again.
-    if(f.status !== 'added') return;
-    if(f.filename.startsWith(PRESETS_SUBFOLDER)) return;
-    if(!WALLPAPER_IMAGE_EXT.test(f.filename)) return;
-    const filename = f.filename.split('/').pop();
-    added[filename] = approxDate;
   });
-
-  writeRecentCommitsCache(added);
-  return added;
+  return dates;
 }
-
-/* ---------- Sorting: newest upload first ----------
- * Ordering uses the SAME confirmed commit dates the New badge check above
- * fetches (see DATE_CONFIRM_WINDOW_MS) - deliberately not the per-browser
- * firstSeenAt guess, so every device shows wallpapers in the same order
- * instead of it depending on when each visitor's own browser happened to
- * first notice a file. That means real order is only knowable for files
- * this mechanism has actually seen added within some past 30-day window -
- * which, going forward, is every future upload. The rest of the
- * (pre-existing) collection has no cheap way to
- * recover its true historical upload date - fetching that many individual
- * dates would blow through the API's rate limit - so those files simply
- * keep their previous relative order, placed after everything with a
- * confirmed date. Persisted (not just cached for the hour the "is it new"
- * check uses) so a date, once learned, is never lost even after the file
- * ages out of the 7-day new-window and stops coming back from the API.
- */
-const CONFIRMED_DATES_KEY = 'blapples-wallpaper-confirmed-dates-v1';
-
-// One-time backfill target: run scripts/backfill-dates.sh (see that file)
-// against a local clone of the repo - it reads your actual git history
-// directly, no API/rate-limit involved at all - then paste its output
-// here. This is what makes the *existing* collection sort correctly and
-// identically on every device, including a phone that's never visited
-// before, instead of only new uploads from now on getting that treatment.
-// Anything the live GitHub check learns later (new uploads) still layers
-// on top of this at runtime; re-running the script and updating this
-// object folds those into the shared baseline too, whenever you want to.
-//
-// This block is regenerated automatically by scripts/backfill_dates.py,
-// run on a schedule by .github/workflows/backfill-wallpaper-dates.yml -
-// hand edits between the markers below will just get overwritten on the
-// next scheduled run.
-// AUTO-GENERATED:BASELINE_CONFIRMED_DATES:START
-const BASELINE_CONFIRMED_DATES = {
-  "104902659_p0.jpg": 1786888839000,
-  "1099713.jpg": 1786888839000,
-  "1147143 (Edited).jpg": 1786888839000,
-  "11SR-Kozue-Otomune-Cheerleader-1Eyvho.png": 1786888839000,
-  "1258a0593cc8088fb762c26f84e0b620 (Edited).jpg": 1786857139000,
-  "1263603.jpg": 1786888839000,
-  "1350221.jpeg": 1786888839000,
-  "1350961.jpeg": 1786888839000,
-  "1363442.jpeg": 1786857139000,
-  "1407447.png": 1786857139000,
-  "141050669_p0_master1200_upscayl_3x_digital-art-4x.png": 1786857139000,
-  "143852058_p1.jpg": 1786857139000,
-  "1db504abe201756f3a65f8e8beb92b85_upscayl_2x_digital-art-4x.png": 1786857139000,
-  "20230710225108_auto_x2.png": 1786857139000,
-  "20230710225415_auto_x2.png": 1786857139000,
-  "20230710230005_1.png": 1786969917000,
-  "20230716120809.png": 1786971562000,
-  "20231112201328.png": 1786970528000,
-  "20240921195317.png": 1786888839000,
-  "20240921195325.png": 1786971562000,
-  "24whdhr14vyf1.png": 1786857139000,
-  "31UR-Kozue-Otomune-Moodmaker-Zpnudc.png": 1786888839000,
-  "392UR-Shibuya-Kanon-Cool-\u5e78\u305b\u306e\u30a2\u30c3\u30d7\u30eb\u30d1\u30a4-1DqtMS.png": 1786857139000,
-  "408LR-Kozue-Otomune-Performer-bbDI7e.png": 1786888839000,
-  "409LR-Tsuzuri-Yugiri-Moodmaker-T9PhyJ.png": 1786888839000,
-  "470681456_27869924529319474_1758469708324410209_n.jpg": 1786888839000,
-  "4bc500aa25c94af8a89c2f91b284cb46_upscayl_4x_digital-art-4x.png": 1786857139000,
-  "515UR-Sayaka-Murano-Performer-tGFk1W.png": 1786888839000,
-  "523UR-Shibuya-Kanon-Pure-\u3075\u305f\u308a\u3067\u30dd\u30fc\u30ba-xxioW8.png": 1786857139000,
-  "60SR-Tsuzuri-Yugiri-Performer-exGgfJ.png": 1786888839000,
-  "60SR-Tsuzuri-Yugiri-Performer-g69JUA.png": 1786888839000,
-  "73SR-Tsuzuri-Yugiri-Moodmaker-PoGrXE.png": 1786888839000,
-  "86UR-Tsuzuri-Yugiri-Moodmaker-eBedK3.png": 1786888839000,
-  "89UR-Tsuzuri-Yugiri-Moodmaker-5ke650.png": 1786888839000,
-  "9849rs03bggg1.jpeg": 1786888839000,
-  "a67d69ac9416d329b3db219f77c9a6fd_upscayl_2x_digital-art-4x.png": 1786857139000,
-  "a8mc0spbo7gg1.jpeg": 1786857139000,
-  "ahdrp1opm16g1.png": 1786888839000,
-  "ahri-crystal-rose-skin-lol-wild-rift.jpg": 1786866425000,
-  "ahri-spirit-blossom-after-hours-spirit-blossom-springs.jpg": 1786866425000,
-  "ahri-spirit-blossom-springs.jpg": 1786866425000,
-  "animewall.png": 1786888839000,
-  "card_after_training100_converted.jpg": 1786857139000,
-  "card_after_training101_converted.jpg": 1786857139000,
-  "card_after_training102_converted.jpg": 1786857139000,
-  "card_after_training103_converted.jpg": 1786857139000,
-  "card_after_training105_converted.jpg": 1786857139000,
-  "card_after_training106_converted.jpg": 1786857139000,
-  "card_after_training107_converted.jpg": 1786857139000,
-  "card_after_training108_converted.jpg": 1786857139000,
-  "card_after_training109_converted.jpg": 1786857139000,
-  "card_after_training10_converted.jpg": 1786857139000,
-  "card_after_training110_converted.jpg": 1786857139000,
-  "card_after_training111_converted.jpg": 1786857139000,
-  "card_after_training11_converted.jpg": 1786857139000,
-  "card_after_training13_converted.jpg": 1786857139000,
-  "card_after_training14_converted.jpg": 1786857139000,
-  "card_after_training15_converted.jpg": 1786857139000,
-  "card_after_training17_converted.jpg": 1786857139000,
-  "card_after_training18_converted.jpg": 1786857139000,
-  "card_after_training19_converted.jpg": 1786857139000,
-  "card_after_training1_converted.jpg": 1786857139000,
-  "card_after_training20_converted.jpg": 1786857139000,
-  "card_after_training21_converted.jpg": 1786857139000,
-  "card_after_training22_converted.jpg": 1786857139000,
-  "card_after_training23_converted.jpg": 1786857139000,
-  "card_after_training24_converted.jpg": 1786857139000,
-  "card_after_training25_converted.jpg": 1786857139000,
-  "card_after_training26_converted.jpg": 1786857139000,
-  "card_after_training27_converted.jpg": 1786857139000,
-  "card_after_training28_converted.jpg": 1786857139000,
-  "card_after_training29_converted.jpg": 1786857139000,
-  "card_after_training2_converted.jpg": 1786857139000,
-  "card_after_training30_converted.jpg": 1786857139000,
-  "card_after_training31_converted.jpg": 1786857139000,
-  "card_after_training32_converted.jpg": 1786857139000,
-  "card_after_training33_converted.jpg": 1786857139000,
-  "card_after_training34_converted.jpg": 1786857139000,
-  "card_after_training35_converted.jpg": 1786857139000,
-  "card_after_training36_converted.jpg": 1786857139000,
-  "card_after_training37_converted.jpg": 1786857139000,
-  "card_after_training38_converted.jpg": 1786857139000,
-  "card_after_training39_converted.jpg": 1786857139000,
-  "card_after_training3_converted.jpg": 1786857139000,
-  "card_after_training40_converted.jpg": 1786857139000,
-  "card_after_training41_converted.jpg": 1786857139000,
-  "card_after_training42_converted.jpg": 1786857139000,
-  "card_after_training43_converted.jpg": 1786857139000,
-  "card_after_training44_converted.jpg": 1786857139000,
-  "card_after_training45_converted.jpg": 1786857139000,
-  "card_after_training46_converted.jpg": 1786857139000,
-  "card_after_training47_converted.jpg": 1786857139000,
-  "card_after_training48_converted.jpg": 1786857139000,
-  "card_after_training49_converted.jpg": 1786857139000,
-  "card_after_training4_converted.jpg": 1786857139000,
-  "card_after_training50_converted.jpg": 1786857139000,
-  "card_after_training51_converted.jpg": 1786857139000,
-  "card_after_training52_converted.jpg": 1786857139000,
-  "card_after_training53_converted.jpg": 1786857139000,
-  "card_after_training54_converted.jpg": 1786857139000,
-  "card_after_training55_converted.jpg": 1786857139000,
-  "card_after_training56_converted.jpg": 1786857139000,
-  "card_after_training57_converted.jpg": 1786857139000,
-  "card_after_training58_converted.jpg": 1786857139000,
-  "card_after_training59_converted.jpg": 1786857139000,
-  "card_after_training5_converted.jpg": 1786857139000,
-  "card_after_training60_converted.jpg": 1786857139000,
-  "card_after_training61_converted.jpg": 1786857139000,
-  "card_after_training62_converted.jpg": 1786857139000,
-  "card_after_training63_converted.jpg": 1786857139000,
-  "card_after_training64_converted.jpg": 1786857139000,
-  "card_after_training65_converted.jpg": 1786857139000,
-  "card_after_training66_converted.jpg": 1786857139000,
-  "card_after_training67_converted.jpg": 1786857139000,
-  "card_after_training68_converted.jpg": 1786857139000,
-  "card_after_training69_converted.jpg": 1786857139000,
-  "card_after_training6_converted.jpg": 1786857139000,
-  "card_after_training70_converted.jpg": 1786857139000,
-  "card_after_training71_converted.jpg": 1786857139000,
-  "card_after_training72_converted.jpg": 1786857139000,
-  "card_after_training73_converted.jpg": 1786857139000,
-  "card_after_training74_converted.jpg": 1786857139000,
-  "card_after_training75_converted.jpg": 1786857139000,
-  "card_after_training76_converted.jpg": 1786857139000,
-  "card_after_training77_converted.jpg": 1786857139000,
-  "card_after_training78_converted.jpg": 1786857139000,
-  "card_after_training79_converted.jpg": 1786857139000,
-  "card_after_training7_converted.jpg": 1786857139000,
-  "card_after_training80_converted.jpg": 1786857139000,
-  "card_after_training81_converted.jpg": 1786857139000,
-  "card_after_training82_converted.jpg": 1786857139000,
-  "card_after_training83_converted.jpg": 1786857139000,
-  "card_after_training84_converted.jpg": 1786857139000,
-  "card_after_training85_converted.jpg": 1786857139000,
-  "card_after_training86_converted.jpg": 1786857139000,
-  "card_after_training87_converted.jpg": 1786857139000,
-  "card_after_training88_converted.jpg": 1786857139000,
-  "card_after_training8_converted.jpg": 1786857139000,
-  "card_after_training90_converted.jpg": 1786857139000,
-  "card_after_training91_converted.jpg": 1786857139000,
-  "card_after_training92_converted.jpg": 1786857139000,
-  "card_after_training93_converted.jpg": 1786857139000,
-  "card_after_training94_converted.jpg": 1786857139000,
-  "card_after_training95_converted.jpg": 1786857139000,
-  "card_after_training96_converted.jpg": 1786857139000,
-  "card_after_training97_converted.jpg": 1786857139000,
-  "card_after_training99_converted.jpg": 1786857139000,
-  "card_after_training9_converted.jpg": 1786857139000,
-  "card_after_training_converted.jpg": 1786857139000,
-  "card_normal104_converted.jpg": 1786857139000,
-  "card_normal12_converted.jpg": 1786857139000,
-  "card_normal16_converted.jpg": 1786857139000,
-  "card_normal98_converted.jpg": 1786857139000,
-  "cropped-1920-1080-1289762.png": 1786888839000,
-  "ddfqwk3t9fye1.png": 1786857139000,
-  "does-anyone-have-this-wallpaper-upscale-with-high-v0-rs93c45pe9vg1.png": 1786888839000,
-  "e4683d2da5d9417f318ace2099c54090_upscayl_4x_ultrasharp-4x.png": 1786857139000,
-  "Ec5uxpPVcAIzkKN.jpg": 1786888839000,
-  "egpg4de1i1gg1.png": 1786888839000,
-  "evanescia.jpg": 1786857139000,
-  "F4ydtgiXwAA7C4u_upscayl_4x_digital-art-4x.png": 1786857139000,
-  "FaF-KmfakAEj0h_.jpg": 1786888839000,
-  "FNKQSKPaQAIpBrp.jpg": 1786888839000,
-  "FObEvVYakAMTTIp.jpg": 1786888839000,
-  "FvBmW1gacAAARhm.jpg": 1786888839000,
-  "FvQ1UpSaYAA_-Hd1.jpg": 1786888839000,
-  "GNb03eLbIAASOAe.jpg": 1786857139000,
-  "Go8NIhea4AAm2ok.jpg": 1786857139000,
-  "goddess-of-victory-3840x2160-24159.jpg": 1786944977000,
-  "GOvxxI-boAA4JQg (Edited)_upscayl_3x_digital-art-4x.png": 1786857139000,
-  "Gy9HfYyboAEfjbQ.jpg": 1786857139000,
-  "haigyqaa9fch1.jpeg": 1786944977000,
-  "HB3Nqzra4AAcSQx.jpg": 1786888839000,
-  "himeko_nova.jpg": 1786857139000,
-  "HKhpaUHXMAAB2fu_upscayl_2x_digital-art-4x.png": 1786857139000,
-  "HNRCja-aMAA6JdE.jpg": 1786857139000,
-  "ill just lie here by Napdust_upscayl_3x_ultrasharp-4x.png": 1786857139000,
-  "immortalized-legend-ahri.jpg": 1786866425000,
-  "kc4tgx8qhmwf1.png": 1786857139000,
-  "kv421f64v6eg1.png": 1786857139000,
-  "macos-27-golden-4480x3088-26625.png": 1786857139000,
-  "macos-27-golden-4480x3088-26626.png": 1786857139000,
-  "MacTahoe-day.jpeg": 1786888839000,
-  "MacTahoe-night.jpeg": 1786888839000,
-  "Maomao(1)_upscayl_2x_digital-art-4x.png": 1786857139000,
-  "maomao_upscayl_2x_digital-art-4x.png": 1786857139000,
-  "metallic-abstract-3840x2160-26734.jpg": 1786857139000,
-  "resident-evil-2-4k-16.jpg": 1786944977000,
-  "risen-legend-ahri.jpg": 1786866425000,
-  "rr0lxgm9vvng1.png": 1786888839000,
-  "sage-valorant-game-art-4k-wallpaper-uhdpaper.com-634@1@f.jpg": 1786857139000,
-  "spider-noir-2026-3840x2160-24881.jpg": 1786857139000,
-  "spirit_blossom_kindred_by_brunnne_de1r17x.png": 1786857139000,
-  "surreal-cherry-3840x2160-26233.jpg": 1786857139000,
-  "utblmn7ecxtf1.jpeg": 1786857139000,
-  "videoframe_118870.png": 1786865703000,
-  "wallhaven-kx6xl1_1920x1080.png": 1786969691000,
-  "windows-xp-3840x2160-17062.jpg": 1786857139000,
-  "wwdc-2026-glow-all-3840x2160-26628.png": 1786857139000,
-  "yande.re 1255699 sample fishnets luminaria_pro maimiya_rinne mui_maru wallpaper_upscayl_2x_ultrasharp-4x.png": 1786857139000,
-};
-// AUTO-GENERATED:BASELINE_CONFIRMED_DATES:END
-
 function readConfirmedDates(){
-  let dates = {...BASELINE_CONFIRMED_DATES};
+  if(manifestDates) return manifestDates;
+  // Manifest hasn't resolved yet this page load (or failed) - fall back to
+  // whatever this browser cached from its last successful fetch, so
+  // ordering stays consistent instead of collapsing to pure alphabetical
+  // every time the network hiccups.
   try{
     const raw = localStorage.getItem(CONFIRMED_DATES_KEY);
     if(raw){
       const data = JSON.parse(raw);
-      if(data && typeof data === 'object') dates = {...dates, ...data};
+      if(data && typeof data === 'object') return data;
     }
   }catch(err){
-    // Ignore - the baseline above still gives correct, consistent ordering.
+    // Ignore - falls through to {} below.
   }
-  return dates;
-}
-
-function mergeConfirmedDates(added, knownFilenames){
-  const dates = readConfirmedDates();
-  Object.keys(added).forEach(filename=>{
-    if(!(filename in dates) || added[filename] < dates[filename]){
-      dates[filename] = added[filename];
-    }
-  });
-  // Forget anything no longer in the collection, same as the first-seen map.
-  if(knownFilenames){
-    Object.keys(dates).forEach(filename=>{
-      if(!knownFilenames.has(filename)) delete dates[filename];
-    });
-  }
-  try{
-    localStorage.setItem(CONFIRMED_DATES_KEY, JSON.stringify(dates));
-  }catch(err){
-    // Non-fatal - sorting just falls back to unconfirmed order next load.
-  }
-  return dates;
+  return {};
 }
 
 // Newest confirmed date first; anything without a confirmed date keeps its
@@ -3854,39 +3448,36 @@ function applySortMode(mode){
   sorted.forEach(frame => { if(frame._card) grid.appendChild(frame._card); });
 }
 
-// Runs after the authoritative GitHub manifest is already rendered (with
-// the localStorage-based isNew guess). Once the real commit-history answer
-// comes back, this corrects any frame whose guess was wrong - most
-// commonly a first-time visit on a new device, where the guess was "not
-// new" for everything - and refreshes the New Wallpapers section, each
-// card's badge, and the main-grid duplicate-hiding to match. It also
-// merges the newly-confirmed dates into the permanent sort record and
-// reorders the already-built cards to match, without reloading them.
+// Runs after the initial render (with the localStorage-based isNew guess
+// from trackNewWallpapers). Once manifest.json resolves, this corrects any
+// frame whose guess was wrong - most commonly a first-time visit on a new
+// device, where the guess was "not new" for everything - and refreshes the
+// New Wallpapers section, each card's badge, and sort order to match.
 async function applyGitHistoryNewFlags(frames){
-  let added;
+  let dates;
   try{
-    added = await fetchRecentlyAddedFilenames();
+    dates = await fetchManifestDates();
   }catch(err){
-    console.warn('Could not confirm new wallpapers from git history, keeping the local guess:', err.message);
+    console.warn('Could not load wallpaper manifest, keeping local guess/cache:', err.message);
     return;
   }
+
+  manifestDates = dates;
+  try{
+    localStorage.setItem(CONFIRMED_DATES_KEY, JSON.stringify(dates));
+  }catch(err){
+    // Non-fatal - sorting just falls back to this session's in-memory copy.
+  }
+
   let changed = false;
   frames.forEach(frame=>{
-    // `added` now covers a 30-day window (DATE_CONFIRM_WINDOW_MS) so sort
-    // dates have a longer runway to get confirmed - see that constant's
-    // comment. The "New" badge itself still needs the stricter 7-day
-    // NEW_WINDOW_MS, so that's checked explicitly here rather than just
-    // membership in `added`.
-    const addedDate = frame.filename ? added[frame.filename] : undefined;
+    const addedDate = frame.filename ? dates[frame.filename] : undefined;
     const isNew = addedDate != null && (Date.now() - addedDate) < NEW_WINDOW_MS;
     if(frame.isNew !== isNew){
       frame.isNew = isNew;
       changed = true;
     }
   });
-
-  const knownFilenames = new Set(frames.map(f => f.filename).filter(Boolean));
-  mergeConfirmedDates(added, knownFilenames);
 
   // Always resort using the latest known dates (baseline + anything just
   // learned), and reorder the main grid's existing cards to match - not
@@ -5121,14 +4712,9 @@ async function init(){
     // Authoritative: this is the live GitHub listing, so it's the one
     // allowed to stamp genuinely new filenames with today's date.
     renderFrames(finalFrames, false, true);
-    // If the file list itself changed since this browser's last visit,
-    // any cached "what's new" answer predates that change and is stale -
-    // drop it so the check below hits GitHub fresh instead of waiting up
-    // to an hour to notice.
-    invalidateRecentCommitsCacheIfManifestChanged(finalFrames);
-    // Then confirm/correct those isNew guesses against the repo's actual
-    // commit history in the background, so every device ends up agreeing
-    // on what's new instead of it depending on local browser memory.
+    // Confirm/correct those isNew guesses and sort order against the
+    // published manifest, so every device ends up agreeing instead of it
+    // depending on local browser memory.
     applyGitHistoryNewFlags(finalFrames);
   }catch(err){
     console.warn('Could not refresh wallpapers from GitHub:', err.message);
