@@ -3100,6 +3100,41 @@ async function fetchWallpapersFromGitHub(src){
     });
 }
 
+/* ---------- Fallback: build the list from manifest.json when the GitHub API fails ---------- */
+async function fetchWallpapersFromManifest(src){
+  const res = await fetch(MANIFEST_URL, { cache: 'no-store' });
+  if(!res.ok) throw new Error(`manifest.json responded ${res.status}`);
+  const data = await res.json();
+  const list = Array.isArray(data?.wallpapers) ? data.wallpapers : null;
+  if(!list) throw new Error('Unexpected manifest.json shape');
+  const imageExt = /\.(png|jpe?g|webp|gif)$/i;
+  return list
+    .map(e => e && e.filename)
+    .filter(name => typeof name === 'string' && imageExt.test(name))
+    .sort((a,b) => a.localeCompare(b))
+    .map((name, i) => {
+      const dir = src.path ? src.path + '/' : '';
+      const originalUrl = `https://raw.githubusercontent.com/${src.user}/${src.repo}/${src.branch}/${dir}${encodeURIComponent(name)}`;
+      return normalizeFrame({
+        title: titleFromFilename(name),
+        src: originalUrl,
+        previewSrc: makePreviewUrl(originalUrl, CARD_PREVIEW_WIDTH),
+        lightboxSrc: makePreviewUrl(originalUrl, LIGHTBOX_PREVIEW_WIDTH),
+        filename: name,
+        frameNo: i + 1,
+      });
+    });
+}
+
+async function fetchWallpapersWithFallback(src){
+  try{
+    return await fetchWallpapersFromGitHub(src);
+  }catch(err){
+    console.warn('GitHub API listing failed, using manifest.json instead:', err.message);
+    return await fetchWallpapersFromManifest(src);
+  }
+}
+
 /* ---------- Placeholder art (used only if the repo fetch fails) ---------- */
 function hexToRgb(hex){ const n=parseInt(hex.replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
 function hexToRgba(hex,a){ const [r,g,b]=hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; }
@@ -4689,7 +4724,7 @@ async function init(){
   // Always try to refresh the manifest in the background so newly added
   // wallpapers still appear without requiring the user to reopen the file.
   try{
-    const freshFrames = await fetchWallpapersFromGitHub(GITHUB_SOURCE);
+    const freshFrames = await fetchWallpapersWithFallback(GITHUB_SOURCE);
     if(!freshFrames.length) throw new Error('No images found in that repo/path');
 
     // Never replace a known-good manifest with a transiently incomplete
